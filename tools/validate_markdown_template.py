@@ -11,6 +11,7 @@ def is_list(text):
     try:
         text_as_list = json.loads(text)
     except:
+        logging.debug("Could not convert string to python object: {0}".format(text_as_list))
         return False
 
     return isinstance(text_as_list, list)
@@ -75,7 +76,6 @@ class MarkdownValidator(object):
     # TODO: Change headings to dict
     HEADINGS = []  # Tuples of (heading_text, count). Use None if there is no limit on how many times the heading can appear.
     DOC_HEADERS = {}
-
 
     def __init__(self, filename):
         with open(filename, 'rU') as f:
@@ -212,6 +212,7 @@ def _cmd_validate_batch(parsed_arg_obj):
 def start_logging():
     """Start logging"""
     # TODO: Allow results to be captured in text files by adding a second logger
+    # TODO: Errors should be sent to stderr
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
