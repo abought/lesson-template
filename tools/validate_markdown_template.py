@@ -11,7 +11,7 @@ def is_list(text):
     try:
         text_as_list = json.loads(text)
     except:
-        logging.debug("Could not convert string to python object: {0}".format(text_as_list))
+        logging.debug("Could not convert string to python object: {0}".format(text))
         return False
 
     return isinstance(text_as_list, list)
@@ -77,23 +77,33 @@ class MarkdownValidator(object):
     HEADINGS = []  # Tuples of (heading_text, count). Use None if there is no limit on how many times the heading can appear.
     DOC_HEADERS = {}
 
-    def __init__(self, filename):
-        with open(filename, 'rU') as f:
-            self.markdown = f.read()
+    def __init__(self, filename=None, markdown=None):
+        """Pass in either a markdown string, or the path to a file containing markdown"""
+        if filename:
+            with open(filename, 'rU') as f:
+                self.markdown = f.read()
+        else:
+            self.markdown = markdown
 
-        ast = self._parse_markdown()
+        ast = self._parse_markdown(self.markdown)
         self.ast = CommonMarkHelper(ast)
 
-    def _parse_markdown(self):
+    def _parse_markdown(self, markdown):
         parser = CommonMark.DocParser()
-        ast = parser.parse(self.markdown)
+        ast = parser.parse(markdown)
         return ast
 
     def __validate_hrs(self):
         """Verify that the header section at top of document is bracketed by two horizontal rules"""
         # The header section should be bracketed by two HRs in the markup
         valid = True
-        for hr in [self.ast.children[0], self.ast.children[2]]:
+        try:
+            hr_nodes = [self.ast.children[0], self.ast.children[2]]
+        except:
+            logging.error("Document is too short, and must include header sections")
+            return False
+
+        for hr in hr_nodes:
             if not self.ast.is_hr(hr):
                 logging.error("Expected horizontal rule (---) at line: {0}".format(hr.start_line))
                 valid = False
@@ -134,11 +144,20 @@ class MarkdownValidator(object):
                  for heading_text, max_count in self.HEADINGS]
         return all(tests)
 
-    def validate(self):
-        """Perform all required validations"""
-        tests = [self._validate_section_headings(),
-                 self._validate_doc_headers()]
+    def _run_tests(self):
+        """Let user override the tests here, so that errors and exceptions can be captured by validate method"""
+        tests = [self._validate_doc_headers(),
+                 self._validate_section_headings()]
         return all(tests)
+
+    def validate(self):
+        """Perform all required validations. Wrap in exception handler"""
+        try:
+            return self._run_tests()
+        except IndexError:
+            logging.error("Document is missing critical sections")
+            return False
+
 
 
 class HomePageValidator(MarkdownValidator):
@@ -151,12 +170,27 @@ class HomePageValidator(MarkdownValidator):
                    'keywords': is_list}
 
     def _validate_intro_section(self):
-        """Validate the content of a paragraph / intro section"""
-        intro_section = self.ast.children[3]
-        # FIXME: Prereqs is inside a block element
-        return self.ast.has_section_heading("Prerequisites", ast_node=intro_section, limit=1)
+        """Validate the content of a paragraph / intro section: Paragraph of text, followed by blockquote and list of prereqs"""
+        intro_block = self.ast.children[3]
+        intro_section = self.ast.is_paragraph(intro_block)
+        if not intro_section:
+            logging.error("Expected paragraph of introductory text at {0}".format(intro_block.start_line))
 
-    def validate(self):
+        # Validate the prerequisites block
+        prereqs_block = self.ast.children[4]
+
+        prereqs_indented = self.ast.is_heading(prereqs_block)
+        prereqs_header = self.ast.has_section_heading("Prerequisites", ast_node=prereqs_block, limit=1)
+        prereqs_has_content = self.ast.has_number_children(prereqs_block, minc=2)
+
+        prereqs_tests = all([prereqs_indented, prereqs_header, prereqs_has_content])
+
+        if not prereqs_tests:
+            logging.error("Intro section should contain an indented section titled 'Prerequisites', which should not be empty, at line {0}".format(prereqs_block.start_line))
+
+        return intro_section and prereqs_tests
+
+    def _run_tests(self):
         tests = [self._validate_intro_section()]
         parent_tests = super(HomePageValidator, self).validate()
         return all(tests) and parent_tests
