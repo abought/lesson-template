@@ -116,7 +116,8 @@ class MarkdownValidator(object):
             logging.warning("Unrecognized label in document header section: {0}".format(label))
             return False
 
-        validate_header = self.DOC_HEADERS[label]
+        validation_function = self.DOC_HEADERS[label]
+        validate_header = validation_function(text)
         if not validate_header:
             logging.error("Document header for label {0} does not follow expected format".format(label))
         return validate_header
@@ -133,7 +134,7 @@ class MarkdownValidator(object):
         checked_headers = [self.__validate_one_doc_header_row(s)
                            for s in ast_header_node.strings]
 
-        # No extraneous headers
+        # Must not be missing headers, and must not have any extraneous header lines either
         only_headers = (len(ast_header_node.strings) == len(self.DOC_HEADERS.keys()))
 
         return has_hrs and all(checked_headers) and only_headers
@@ -157,7 +158,6 @@ class MarkdownValidator(object):
         except IndexError:
             logging.error("Document is missing critical sections")
             return False
-
 
 
 class HomePageValidator(MarkdownValidator):
