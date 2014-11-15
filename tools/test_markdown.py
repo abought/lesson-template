@@ -50,15 +50,41 @@ keywords: this is not a list
 ---""")
         self.assertEqual(validator._validate_doc_headers(), False)
 
-    def test_index_has_valid_headings(self):
+    def test_index_has_valid_section_headings(self):
         """The provided index page"""
-        res = self.sample_file._validate_section_headings()
+        res = self.sample_file._validate_section_heading_order()
         self.assertEqual(res, True)
 
-    def test_index_invalid_headings_cause_error(self):
+    def test_index_fail_when_section_heading_absent(self):
         res = self.sample_file.ast.has_section_heading("Fake heading")
         self.assertEqual(res, False)
 
+    def test_fail_when_section_headings_in_wrong_order(self):
+        validator = self._create_validator("""---
+layout: lesson
+title: Lesson Title
+keywords: ["some", "key terms", "in a list"]
+---
+Paragraph of introductory material.
+
+> ## Prerequisites
+>
+> A short paragraph describing what learners need to know
+> before tackling this lesson.
+
+## Other Resources
+
+* [Motivation](motivation.html)
+* [Reference Guide](reference.html)
+* [Instructor's Guide](instructors.html)
+
+
+## Topics
+
+* [Topic Title 1](01-one.html)
+* [Topic Title 2](02-two.html)""")
+
+        self.assertEqual(validator._validate_section_heading_order(), False)
 
 if __name__ == "__main__":
     unittest.main()

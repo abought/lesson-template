@@ -28,15 +28,19 @@ class CommonMarkHelper(object):
         self.data = ast
         self.children = self.data.children
 
+    def get_section_headings(self, ast_node=None):
+        if ast_node is None:
+            ast_node = self.data
+        return [n for n in ast_node.children if self.is_heading(n)]
+
     def has_section_heading(self, section_title, ast_node=None, limit=None):
         """Does the markdown contain (no more than x copies of) the specified heading text?"""
         if ast_node is None:
-            ast_node = self.data  # If no level of the document is specified, search top-level headings
-        if limit is None:
-            limit = sys.maxint
+            ast_node = self.data
 
-        nodes = [n for n in ast_node.children if n.t == "ATXHeader" and section_title in n.strings]
-        num_nodes = len(nodes)
+        num_nodes = len([n for n in self.get_section_headings(ast_node)
+                         if n.strings[0] == section_title])
+
         if num_nodes == 0:
             logging.error("Document does not contain the specified heading: {0}".format(section_title))
         elif num_nodes > limit:
@@ -44,10 +48,6 @@ class CommonMarkHelper(object):
         else:
             logging.info("Verified that document contains the specified heading: {0}".format(section_title))
         return (0 < num_nodes <= limit)
-
-    def get_child_type(self, ast_node, child_type):
-        """Get all children of a given node, if they are of the specified type"""
-        return [n for n in ast_node.children if n.t == child_type]
 
     def has_number_children(self, ast_node, exact=None, minc=0, maxc=sys.maxint):
         """Does the specified node (such as a bulleted list) have the expected number of children?"""
@@ -73,12 +73,12 @@ class CommonMarkHelper(object):
 class MarkdownValidator(object):
     """Base class for markdown validation; contains helper methods for working with the CommonMark ast,
     and basic validation skeleton to be extended for specific page types"""
-    # TODO: Change headings to dict
-    HEADINGS = []  # Tuples of (heading_text, count). Use None if there is no limit on how many times the heading can appear.
+    HEADINGS = []
     DOC_HEADERS = {}
 
     def __init__(self, filename=None, markdown=None):
-        """Pass in either a markdown string, or the path to a file containing markdown"""
+        """Pass in the path to a filename containing markdown, OR a valid markdown string.
+            The latter is useful for unit testing."""
         if filename:
             with open(filename, 'rU') as f:
                 self.markdown = f.read()
@@ -137,18 +137,46 @@ class MarkdownValidator(object):
         # Must not be missing headers, and must not have any extraneous header lines either
         only_headers = (len(ast_header_node.strings) == len(self.DOC_HEADERS.keys()))
 
-        return has_hrs and all(checked_headers) and only_headers
+        # Headings must appear in the order expected
+        valid_order = self._validate_section_heading_order()
 
-    def _validate_section_headings(self):
-        """Verify that the top level document contains all specified headings. (don't just stop when one fails)"""
-        tests = [self.ast.has_section_heading(heading_text, limit=max_count)
-                 for heading_text, max_count in self.HEADINGS]
-        return all(tests)
+        return has_hrs and all(checked_headers) and only_headers and valid_order
+
+    def _validate_section_heading_order(self, ast_node=None, headings=None):
+        """Verify that section headings appear, and in the order expected"""
+        if ast_node is None:
+            ast_node = self.ast.data
+            headings = self.HEADINGS
+
+        heading_nodes = self.ast.get_section_headings(ast_node)
+        heading_labels = [n.strings[0] for n in heading_nodes]
+
+        # Check for missing and extra headings
+        missing_headings = [expected_heading for expected_heading in headings
+                            if expected_heading not in heading_labels]
+
+        extra_headings = [found_heading for found_heading in heading_labels
+                          if found_heading not in headings]
+
+        for h in missing_headings:
+            logging.error("Document does not contain the expected headings: {0}".format(h))
+
+        for h in extra_headings:
+            logging.warning("Document contains additional heading not specified in the template: {0}".format(h))
+
+        # Check that the subset of headings in the template spec matches order in the document
+        valid_order = True
+        headings_overlap = [h for h in heading_labels if h in headings]
+        if len(missing_headings) == 0 and headings_overlap != headings:
+            valid_order = False
+            logging.error("Document headings do not match the order specified by the template")
+
+        return (len(missing_headings) == 0 and valid_order)
 
     def _run_tests(self):
         """Let user override the tests here, so that errors and exceptions can be captured by validate method"""
         tests = [self._validate_doc_headers(),
-                 self._validate_section_headings()]
+                 self._validate_section_heading_order()]
         return all(tests)
 
     def validate(self):
@@ -162,8 +190,8 @@ class MarkdownValidator(object):
 
 class HomePageValidator(MarkdownValidator):
     """Validate the contents of the homepage (index.md)"""
-    HEADINGS = [('Topics', 1),
-                ('Other Resources', 1)]
+    HEADINGS = ['Topics',
+                'Other Resources']
 
     DOC_HEADERS = {'layout': is_str,
                    'title': is_str,
@@ -181,12 +209,12 @@ class HomePageValidator(MarkdownValidator):
 
         prereqs_indented = self.ast.is_heading(prereqs_block)
         prereqs_header = self.ast.has_section_heading("Prerequisites", ast_node=prereqs_block, limit=1)
-        prereqs_has_content = self.ast.has_number_children(prereqs_block, minc=2)
+        prereqs_has_content = self.ast.has_number_children(prereqs_block, minc=2)  # Title and at least some content
 
         prereqs_tests = all([prereqs_indented, prereqs_header, prereqs_has_content])
 
         if not prereqs_tests:
-            logging.error("Intro section should contain an indented section titled 'Prerequisites', which should not be empty, at line {0}".format(prereqs_block.start_line))
+            logging.error("Intro section should contain a blockquoted section titled 'Prerequisites', which should not be empty, at line {0}".format(prereqs_block.start_line))
 
         return intro_section and prereqs_tests
 
@@ -213,7 +241,7 @@ class InstructorPageValidator(MarkdownValidator):
     pass
 
 
-# Associate lesson template names with parsers
+# Associate lesson template names with parsers. Master list of templates recognized by CLI.
 LESSON_TEMPLATES = {"home": HomePageValidator,
                     "topic": TopicPageValidator,
                     "intro": IntroPageValidator,
@@ -246,7 +274,7 @@ def _cmd_validate_batch(parsed_arg_obj):
 def start_logging():
     """Start logging"""
     # TODO: Allow results to be captured in text files by adding a second logger
-    # TODO: Errors should be sent to stderr
+    # TODO: Errors (warning and above) should be sent to stderr
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
@@ -275,6 +303,3 @@ if __name__ == "__main__":
     start_logging()
     parsed_args = command_line()
     parsed_args.func(parsed_args)
-
-    #index_valid = HomePageValidator("../index.md")
-    #print index_valid.validate()
