@@ -1,14 +1,16 @@
 ---
-layout: topic
-title: Topic One
-minutes: 30
+layout: page
+title: Lesson Title
+subtitle: Topic Title One
+minutes: 10
 ---
 > ## Learning Objectives {.objectives}
 >
 > * Learning objective 1
 > * Learning objective 2
 
-Paragraphs of text mixed with:
+Paragraphs of text --- possibly including **definitions** ---
+mixed with:
 
 ~~~ {.python}
 some code:
@@ -28,6 +30,10 @@ and possibly including:
 > ## Callout Box {.callout}
 >
 > An aside of some kind.
+
+or an image from the `figs` directory:
+
+![this is the image's title](fig/example.svg "this is the image's alt text")
 
 > ## Challenge Title {.challenge}
 >
