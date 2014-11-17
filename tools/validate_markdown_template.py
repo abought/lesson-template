@@ -32,6 +32,7 @@ def is_str(text):
     """Validate whether the input is a non-blank python string"""
     return isinstance(text, basestring) and len(text) > 0
 
+
 def is_numeric(text):
     """Validate whether the string represents a number (including unicode)"""
     try:
@@ -306,12 +307,12 @@ class HomePageValidator(MarkdownValidator):
 
 
 class TopicPageValidator(MarkdownValidator):
-    """Validate the markdown contents of a topic page"""
+    """Validate the markdown contents of a topic page, eg 01-topicname.md"""
     DOC_HEADERS = {"layout": is_str,
                    "title": is_str,
                    "minutes": is_numeric}
 
-    # TODO: Write, eg, challenge validator
+    # TODO: Write validator for, eg, challenge section
     def _validate_learning_objective(self):
         learn_node = self.ast.children[3]
         has_heading = self.ast.has_section_heading("Learning Objectives", ast_node=learn_node, limit=1)
@@ -347,7 +348,7 @@ class InstructorPageValidator(MarkdownValidator):
     pass
 
 
-# Associate lesson template names with parsers. Master list of templates recognized by CLI.
+# Associate lesson template names with validators. Master list of templates recognized by CLI.
 LESSON_TEMPLATES = {"home": HomePageValidator,
                     "topic": TopicPageValidator,
                     "intro": IntroPageValidator,
