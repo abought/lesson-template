@@ -137,11 +137,11 @@ GLOBAL_CSS_CLASSES = []  # TODO: Write validator for CSS classes in document
 class MarkdownValidator(object):
     """Base class for markdown validation; contains helper methods for working with the CommonMark ast,
     and basic validation skeleton to be extended for specific page types"""
-    HEADINGS = []
-    DOC_HEADERS = {}
+    HEADINGS = []  # List of strings containing expected heading text
+    DOC_HEADERS = {}  # Rows in header section (first few lines of document). Dictionary of {header_label: validation_func}, eg {'keywords': is_list}
 
     def __init__(self, filename=None, markdown=None):
-        """Pass in the path to a filename containing markdown, OR a valid markdown string.
+        """Pass in the path to a file containing markdown, OR directly pass in a valid markdown string.
             The latter is useful for unit testing."""
         self.filename = filename
         if filename:
@@ -345,7 +345,9 @@ class ReferencePageValidator(MarkdownValidator):
 
 
 class InstructorPageValidator(MarkdownValidator):
-    pass
+    """Simple validator for Instructor's Guide- instructors.md"""
+    HEADINGS = ["Overall", "General Points"]
+    DOC_HEADERS = {"title": is_str}
 
 
 # Associate lesson template names with validators. Master list of templates recognized by CLI.
@@ -407,7 +409,11 @@ def command_line():
 
 
 if __name__ == "__main__":
+    # This is a command line script that can run on either a single file, or a batch of files. Call at command line with flag -h to see options
     start_logging()
     parsed_args = command_line()
     parsed_args.func(parsed_args)
 
+    #### Sample of how validator is used directly
+    #validator = HomePageValidator('../index.md')
+    #print validator.validate()
