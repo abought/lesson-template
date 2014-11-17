@@ -54,7 +54,6 @@ h1, h2, h3, h4, h5, h6  {
 
 h1.title {
     margin:40px 0px;
-    border-bottom:1px solid #515151;
 }
 
 h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
@@ -93,6 +92,17 @@ table.choices tr td {
 /* Database tables do _not_ have double borders */
 table.outlined {
     border-collapse: collapse;
+}
+
+/* Code sample */
+pre.sourceCode{
+    color: ForestGreen;
+}
+pre.output {
+    color: MediumBlue;
+}
+pre.error {
+    color: Red;
 }
 
 /* Printing */
