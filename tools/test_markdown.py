@@ -7,7 +7,7 @@ validate_markdown_template.start_logging()  # Make log messages visible to help 
 class TestHomePage(unittest.TestCase):
     """Test the ability to correctly identify and validate specific sections of a markdown file"""
     def setUp(self):
-        self.sample_file = validate_markdown_template.HomePageValidator('../index.md')  # Passes tests
+        self.sample_file = validate_markdown_template.HomePageValidator('../pages/index.md')  # Passes tests
 
     def _create_validator(self, markdown):
         """Create validator object from markdown string; useful for failures"""
@@ -54,6 +54,25 @@ keywords: this is not a list
         """The provided index page"""
         res = self.sample_file._validate_section_heading_order()
         self.assertEqual(res, True)
+
+    def test_file_links_validate(self):
+        res = self.sample_file._validate_links()
+        self.assertEqual(res, True)
+
+    def test_missing_file_fails_validation(self):
+        """Fail validation when an html file is linked without corresponding markdown file"""
+        validator = self._create_validator("""[Broken link](nonexistent.html)""")
+        self.assertEqual(validator._validate_links(), False)
+
+    def test_website_link_ignored_by_validator(self):
+        """Don't look for markdown if the file linked isn't local- remote website links are ignored"""
+        validator = self._create_validator("""[Broken link](http://website.com/filename.html)""")
+        self.assertEqual(validator._validate_links(), True)
+
+    def test_non_html_link_ignored_by_validator(self):
+        """Don't look for markdown if the file linked isn't an html file"""
+        validator = self._create_validator("""[Broken link](nonexistent.txt)""")
+        self.assertEqual(validator._validate_links(), True)
 
     def test_index_fail_when_section_heading_absent(self):
         res = self.sample_file.ast.has_section_heading("Fake heading")
