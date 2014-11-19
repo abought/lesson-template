@@ -81,9 +81,9 @@ class MarkdownValidator(object):
             return False
 
         validation_function = self.DOC_HEADERS[label]
-        validate_header = validation_function(text)
+        validate_header = validation_function(content)
         if not validate_header:
-            logging.error("Document header for label {0} does not follow expected format".format(label))
+            logging.error("Document header field for label {0} does not follow expected format".format(label))
         return validate_header
 
     # Methods related to specific validation. Override in child classes with specific validators.
@@ -206,13 +206,21 @@ class TopicPageValidator(MarkdownValidator):
     """Validate the markdown contents of a topic page, eg 01-topicname.md"""
     DOC_HEADERS = {"layout": vh.is_str,
                    "title": vh.is_str,
+                   "subtitle": vh.is_str,
                    "minutes": vh.is_numeric}
 
     # TODO: Write validator for, eg, challenge section
     def _validate_learning_objective(self):
-        learn_node = self.ast.children[3]
-        has_heading = self.ast.has_section_heading("Learning Objectives", ast_node=learn_node, limit=1)
-        return has_heading
+        learn_node = self.ast.get_block_titled("Learning Objectives")
+        if learn_node:
+            node_tests = self.ast.has_number_children(learn_node[0], minc=2)  # Title and at least some content
+        else:
+            node_tests = False
+
+        if node_tests is False:
+            logging.error("Topic should contain a blockquoted section titled 'Learning Objectives', which should not be empty")
+
+        return node_tests
 
     def _validate_has_no_headings(self):
         """The top-level document has no headings indicating subtopics. The only valid subheadings are nested in blockquote elements"""
@@ -242,8 +250,10 @@ class ReferencePageValidator(MarkdownValidator):
 
 class InstructorPageValidator(MarkdownValidator):
     """Simple validator for Instructor's Guide- instructors.md"""
-    HEADINGS = ["Overall", "General Points"]
-    DOC_HEADERS = {"title": vh.is_str}
+    HEADINGS = ["Legend", "Overall"]
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str,
+                   "subtitle": vh.is_str}
 
 
 # Associate lesson template names with validators. Master list of templates recognized by CLI.

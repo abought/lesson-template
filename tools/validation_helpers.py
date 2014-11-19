@@ -59,7 +59,8 @@ class CommonMarkHelper(object):
         Returns empty list if no appropriate node is found"""
         if ast_node is None:
             ast_node = self.data
-        return [n for n in ast_node.children if self.is_block(n) and self.has_section_heading(title, ast_node=n)]
+        return [n for n in ast_node.children
+                if self.is_block(n) and self.has_section_heading(title, ast_node=n, show_msg=False)]
 
     def get_section_headings(self, ast_node=None):
         """Returns a list of ast nodes that are headings"""
@@ -85,19 +86,21 @@ class CommonMarkHelper(object):
 
         return links
 
-    def has_section_heading(self, section_title, ast_node=None, limit=sys.maxint):
-        """Does the markdown contain (no more than x copies of) the specified heading text?"""
+    def has_section_heading(self, section_title, ast_node=None, limit=sys.maxint, show_msg=True):
+        """Does the markdown contain (no more than x copies of) the specified heading text?
+        Automatically strips off any CSS attributes when looking for the section title"""
         if ast_node is None:
             ast_node = self.data
 
         num_nodes = len([n for n in self.get_section_headings(ast_node)
-                         if n.strings[0] == section_title])
+                         if strip_attrs(n.strings[0]) == section_title])
 
-        if num_nodes == 0:
+        # Log an error message, unless explicitly told not to (eg if used as a helper method in a larger test)
+        if show_msg and num_nodes == 0:
             logging.error("Document does not contain the specified heading: {0}".format(section_title))
-        elif num_nodes > limit:
+        elif show_msg and num_nodes > limit:
             logging.error("Document must not contain more than {0} copies of the heading {1}".format(limit, section_title or 0))
-        else:
+        elif show_msg:
             logging.info("Verified that document contains the specified heading: {0}".format(section_title))
         return (0 < num_nodes <= limit)
 

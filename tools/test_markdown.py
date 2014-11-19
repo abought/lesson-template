@@ -6,14 +6,23 @@ import validate_markdown_template
 validate_markdown_template.start_logging()  # Make log messages visible to help audit test failures
 
 
-class TestHomePage(unittest.TestCase):
-    """Test the ability to correctly identify and validate specific sections of a markdown file"""
+class BaseTemplateTest(unittest.TestCase):
+    """Common methods for testing template validators"""
+    SAMPLE_FILE = "" # Path to a file that should pass all tests; use as basic benchmark
+    VALIDATOR = validate_markdown_template.MarkdownValidator
+
     def setUp(self):
-        self.sample_file = validate_markdown_template.HomePageValidator('../pages/index.md')  # Passes tests
+        self.sample_file = self.VALIDATOR(self.SAMPLE_FILE)
 
     def _create_validator(self, markdown):
         """Create validator object from markdown string; useful for failures"""
         return validate_markdown_template.HomePageValidator(markdown=markdown)
+
+
+class TestHomePage(BaseTemplateTest):
+    """Test the ability to correctly identify and validate specific sections of a markdown file"""
+    SAMPLE_FILE = "../pages/index.md"
+    VALIDATOR = validate_markdown_template.HomePageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_file.validate()
@@ -110,6 +119,26 @@ Paragraph of introductory material.
 * [Topic Title 2](02-two.html)""")
 
         self.assertEqual(validator._validate_section_heading_order(), False)
+
+
+class TestTopicPage(BaseTemplateTest):
+    """Verifies that the topic page validator works as expected"""
+    SAMPLE_FILE = "../pages/01-one.md"
+    VALIDATOR = validate_markdown_template.TopicPageValidator
+
+    def test_sample_file_passes_validation(self):
+        res = self.sample_file.validate()
+        self.assertTrue(res)
+
+
+class TestInstructorPage(BaseTemplateTest):
+    """Verifies that the instructors page validator works as expected"""
+    SAMPLE_FILE = "../pages/instructors.md"
+    VALIDATOR = validate_markdown_template.InstructorPageValidator
+
+    def test_sample_file_passes_validation(self):
+        res = self.sample_file.validate()
+        self.assertTrue(res)
 
 if __name__ == "__main__":
     unittest.main()
