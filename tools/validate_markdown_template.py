@@ -5,130 +5,29 @@ Validate Software Carpentry lessons according to the markdown template specifica
 http://software-carpentry.org/blog/2014/10/new-lesson-template-v2.html
 
 Validates the presence of headings, as well as specific sub-nodes. Contains validators for several kinds of template.
+
+This is a command line script that can run on either a single file, or a batch of files.
+ Call at command line with flag -h to see options
+
+
+Requires the CommonMark package to run. Type
 """
 
-import argparse, json, logging, os, re, sys
-import CommonMark
+import argparse, logging, os, re, sys
 
+try:
+    import CommonMark
+except ImportError:
+    print "This program requires the CommonMark python package (tested against version 0.5.4)"
+    print "Install using either of the following command line commands:"
+    print "  pip install commonmark"
+    print "  easy_install commonmark"
+    exit(1)
+
+import validation_helpers as vh
 
 # Path to where markdown files are stored: relative to this file, should be ../pages
 MARKDOWN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
-
-
-#### Common validation functions ###
-def is_list(text):
-    """Validate whether the provided string can be converted to a valid python list"""
-    text = text.strip()
-    try:
-        text_as_list = json.loads(text)
-    except ValueError:
-        logging.debug("Could not convert string to python object: {0}".format(text))
-        return False
-
-    return isinstance(text_as_list, list)
-
-
-def is_str(text):
-    """Validate whether the input is a non-blank python string"""
-    return isinstance(text, basestring) and len(text) > 0
-
-
-def is_numeric(text):
-    """Validate whether the string represents a number (including unicode)"""
-    try:
-        float(text)
-        return True
-    except ValueError:
-        return False
-
-
-#### Text cleanup functions, pre-validation
-def strip_attrs(s):
-    """Strip attributes of the form {.name} from a markdown title string"""
-    return re.sub(r"\s\{\..*?\}", "", s)
-
-
-def get_css_class(s):
-    """Return any and all CSS classes: present when a line is suffixed by {.classname}
-    Returns empty list when """
-    return re.findall("\{\.(.*?)\}", s)
-
-
-### Helper objects
-class CommonMarkHelper(object):
-    """Basic helper functions for working with the internal abstract syntax tree produced by CommonMark parser"""
-    def __init__(self, ast):
-        self.data = ast
-        self.children = self.data.children
-
-    def get_section_headings(self, ast_node=None):
-        """Returns a list of ast nodes that are headings"""
-        if ast_node is None:
-            ast_node = self.data
-
-        return [n for n in ast_node.children if self.is_heading(n)]
-
-    def find_links(self, ast_node=None):
-        """Recursive function that locates all hyperlinks under the specified node.
-        Returns a list specifying the destination of each link"""
-        ast_node = ast_node or self.data
-
-        # Links can be hiding in this node in two ways
-        links = [n.destination
-                 for n in ast_node.inline_content if self.is_link(n)]
-
-        if self.is_link(ast_node):
-            links.append(ast_node.destination)
-
-        # Also look for links in sub-nodes
-        for n in ast_node.children:
-            links.extend(self.find_links(n))
-
-        return links
-
-    def has_section_heading(self, section_title, ast_node=None, limit=None):
-        """Does the markdown contain (no more than x copies of) the specified heading text?"""
-        if ast_node is None:
-            ast_node = self.data
-
-        num_nodes = len([n for n in self.get_section_headings(ast_node)
-                         if n.strings[0] == section_title])
-
-        if num_nodes == 0:
-            logging.error("Document does not contain the specified heading: {0}".format(section_title))
-        elif num_nodes > limit:
-            logging.error("Document must not contain more than {0} copies of the heading {1}".format(limit, section_title))
-        else:
-            logging.info("Verified that document contains the specified heading: {0}".format(section_title))
-        return (0 < num_nodes <= limit)
-
-    def has_number_children(self, ast_node, exact=None, minc=0, maxc=sys.maxint):
-        """Does the specified node (such as a bulleted list) have the expected number of children?"""
-
-        if exact:  # If specified, must have exactly this number of children
-            minc = maxc = exact
-
-        return (minc <= len(ast_node.children) <= maxc)
-
-    def is_hr(self, ast_node):
-        """Is the node a horizontal rule (hr)?"""
-        return ast_node.t == 'HorizontalRule'
-
-    def is_heading(self, ast_node):
-        """Is the node a heading/ title?"""
-        return ast_node.t == "ATXHeader"
-
-    def is_paragraph(self, ast_node):
-        """Is the node a paragraph?"""
-        return ast_node.t == "Paragraph"
-
-    def is_list(self, ast_node):
-        """Is the node a list? (ordered or unordered)"""
-        return ast_node.t == "List"
-
-    def is_link(self, ast_node):
-        """Is the node a link?"""
-        return ast_node.t == "Link"
 
 
 GLOBAL_CSS_CLASSES = []  # TODO: Write validator for CSS classes in document
@@ -151,7 +50,7 @@ class MarkdownValidator(object):
             self.markdown = markdown
 
         ast = self._parse_markdown(self.markdown)
-        self.ast = CommonMarkHelper(ast)
+        self.ast = vh.CommonMarkHelper(ast)
 
     def _parse_markdown(self, markdown):
         parser = CommonMark.DocParser()
@@ -214,7 +113,7 @@ class MarkdownValidator(object):
             headings = self.HEADINGS
 
         heading_nodes = self.ast.get_section_headings(ast_node)
-        heading_labels = [strip_attrs(n.strings[0]) for n in heading_nodes]
+        heading_labels = [vh.strip_attrs(n.strings[0]) for n in heading_nodes]
 
         # Check for missing and extra headings
         missing_headings = [expected_heading for expected_heading in headings
@@ -259,6 +158,7 @@ class MarkdownValidator(object):
         tests = [self._validate_doc_headers(),
                  self._validate_section_heading_order(),
                  self._validate_links()]
+
         return all(tests)
 
     def validate(self):
@@ -275,9 +175,8 @@ class HomePageValidator(MarkdownValidator):
     HEADINGS = ['Topics',
                 'Other Resources']
 
-    DOC_HEADERS = {'layout': is_str,
-                   'title': is_str,
-                   'keywords': is_list}
+    DOC_HEADERS = {'layout': vh.is_str,
+                   'title': vh.is_str}
 
     def _validate_intro_section(self):
         """Validate the content of a paragraph / intro section: Paragraph of text, followed by blockquote and list of prereqs"""
@@ -287,17 +186,14 @@ class HomePageValidator(MarkdownValidator):
             logging.error("Expected paragraph of introductory text at {0}".format(intro_block.start_line))
 
         # Validate the prerequisites block
-        prereqs_block = self.ast.children[4]
+        prereqs_block = self.ast.get_block_titled("Prerequisites")
+        if prereqs_block:  # Confirmed it's blockquoted and has the heading; now check contents
+            prereqs_tests = self.ast.has_number_children(prereqs_block[0], minc=2)  # Title and at least some content
+        else:
+            prereqs_tests = False
 
-        prereqs_indented = self.ast.is_heading(prereqs_block)
-        prereqs_header = self.ast.has_section_heading("Prerequisites", ast_node=prereqs_block, limit=1)
-        prereqs_has_content = self.ast.has_number_children(prereqs_block, minc=2)  # Title and at least some content
-
-        prereqs_tests = all([prereqs_indented, prereqs_header, prereqs_has_content])
-
-        if not prereqs_tests:
-            logging.error("Intro section should contain a blockquoted section titled 'Prerequisites', which should not be empty, at line {0}".format(prereqs_block.start_line))
-
+        if prereqs_tests is False:
+            logging.error("Intro section should contain a blockquoted section titled 'Prerequisites', which should not be empty")
         return intro_section and prereqs_tests
 
     def _run_tests(self):
@@ -308,9 +204,9 @@ class HomePageValidator(MarkdownValidator):
 
 class TopicPageValidator(MarkdownValidator):
     """Validate the markdown contents of a topic page, eg 01-topicname.md"""
-    DOC_HEADERS = {"layout": is_str,
-                   "title": is_str,
-                   "minutes": is_numeric}
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str,
+                   "minutes": vh.is_numeric}
 
     # TODO: Write validator for, eg, challenge section
     def _validate_learning_objective(self):
@@ -347,7 +243,7 @@ class ReferencePageValidator(MarkdownValidator):
 class InstructorPageValidator(MarkdownValidator):
     """Simple validator for Instructor's Guide- instructors.md"""
     HEADINGS = ["Overall", "General Points"]
-    DOC_HEADERS = {"title": is_str}
+    DOC_HEADERS = {"title": vh.is_str}
 
 
 # Associate lesson template names with validators. Master list of templates recognized by CLI.
@@ -409,7 +305,6 @@ def command_line():
 
 
 if __name__ == "__main__":
-    # This is a command line script that can run on either a single file, or a batch of files. Call at command line with flag -h to see options
     start_logging()
     parsed_args = command_line()
     parsed_args.func(parsed_args)

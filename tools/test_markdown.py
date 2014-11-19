@@ -13,6 +13,10 @@ class TestHomePage(unittest.TestCase):
         """Create validator object from markdown string; useful for failures"""
         return validate_markdown_template.HomePageValidator(markdown=markdown)
 
+    def test_sample_file_passes_validation(self):
+        res = self.sample_file.validate()
+        self.assertTrue(res)
+
     def test_headers_missing_hrs(self):
         validator = self._create_validator("""Blank row
 
