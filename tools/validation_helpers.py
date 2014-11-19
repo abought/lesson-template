@@ -1,6 +1,7 @@
-import json, logging, re, sys
+#! /usr/bin/env python
 
-__author__ = 'abought'
+
+import json, logging, re, sys
 
 
 #### Common validation functions ###
