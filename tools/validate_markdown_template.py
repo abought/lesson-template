@@ -26,9 +26,6 @@ except ImportError:
 
 import validation_helpers as vh
 
-# Path to where markdown files are stored: relative to this file, should be ../pages
-MARKDOWN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
-
 
 GLOBAL_CSS_CLASSES = []  # TODO: Write validator for CSS classes in document
 
@@ -43,10 +40,14 @@ class MarkdownValidator(object):
         """Pass in the path to a file containing markdown, OR directly pass in a valid markdown string.
             The latter is useful for unit testing."""
         self.filename = filename
+
         if filename:
+            self.markdown_dir = os.path.dirname(filename)  # When checking links, expect markdown files to be in same directory as the input file
             with open(filename, 'rU') as f:
                 self.markdown = f.read()
         else:
+            # If not given a file path, look for markdown in ../pages relative to where the script is located
+            self.markdown_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
             self.markdown = markdown
 
         ast = self._parse_markdown(self.markdown)
@@ -146,7 +147,7 @@ class MarkdownValidator(object):
         for link in links:
             if re.match(r"^[\w,\s-]+\.(htm|html)$", link):  # This is a filename (not a web link), so confirm file exists
                 expected_md_filename = os.path.splitext(link)[0] + os.extsep + "md"
-                expected_md_path = os.path.join(MARKDOWN_DIR, expected_md_filename)
+                expected_md_path = os.path.join(self.markdown_dir, expected_md_filename)
                 if not os.path.isfile(expected_md_path):
                     logging.error("The document links to {0}, but could not find the expected markdown file {1}".format(
                         link, expected_md_path))
