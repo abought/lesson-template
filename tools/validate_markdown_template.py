@@ -13,7 +13,7 @@ This is a command line script that can run on either a single file, or a batch o
 Requires the CommonMark package to run. Type
 """
 
-import argparse, logging, os, re, sys
+import argparse, glob, logging, os, re, sys
 
 try:
     import CommonMark
@@ -22,12 +22,9 @@ except ImportError:
     print "Install using either of the following command line commands:"
     print "  pip install commonmark"
     print "  easy_install commonmark"
-    exit(1)
+    sys.exit(1)
 
 import validation_helpers as vh
-
-
-GLOBAL_CSS_CLASSES = []  # TODO: Write validator for CSS classes in document
 
 
 class MarkdownValidator(object):
@@ -171,7 +168,7 @@ class MarkdownValidator(object):
             return False
 
 
-class HomePageValidator(MarkdownValidator):
+class IndexPageValidator(MarkdownValidator):
     """Validate the contents of the homepage (index.md)"""
     HEADINGS = ['Topics',
                 'Other Resources']
@@ -199,7 +196,7 @@ class HomePageValidator(MarkdownValidator):
 
     def _run_tests(self):
         tests = [self._validate_intro_section()]
-        parent_tests = super(HomePageValidator, self)._run_tests()
+        parent_tests = super(IndexPageValidator, self)._run_tests()
         return all(tests) and parent_tests
 
 
@@ -241,12 +238,19 @@ class TopicPageValidator(MarkdownValidator):
         return all(tests) and parent_tests
 
 
-class IntroPageValidator(MarkdownValidator):
-    pass
+class MotivationPageValidator(MarkdownValidator):
+    """Validate motivation.md"""
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str}
+    # TODO: Find out what validation is needed. This file might be a mix of reveal.js (HTML) + markdown
 
 
 class ReferencePageValidator(MarkdownValidator):
-    pass
+    """Validate reference.md"""
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str,
+                   "subtitle": vh.is_str}
+    HEADINGS = ["Glossary"]
 
 
 class InstructorPageValidator(MarkdownValidator):
@@ -258,16 +262,17 @@ class InstructorPageValidator(MarkdownValidator):
 
 
 # Associate lesson template names with validators. Master list of templates recognized by CLI.
-LESSON_TEMPLATES = {"home": HomePageValidator,
-                    "topic": TopicPageValidator,
-                    "intro": IntroPageValidator,
-                    "reference": ReferencePageValidator,
-                    "instructor": InstructorPageValidator}
+#   Dict of {name: (Validator, filename_pattern)}
+LESSON_TEMPLATES = {"index": (IndexPageValidator, "^index"),
+                    "topic": (TopicPageValidator, "^[0-9]{2}-.*"),
+                    "motivation": (MotivationPageValidator, "^motivation"),
+                    "reference": (ReferencePageValidator, "^reference"),
+                    "instructor": (InstructorPageValidator, "^instructors")}
 
 
 def validate_single(filepath, template):
     """Validate a single markdown file based on a specified template"""
-    validator = LESSON_TEMPLATES[template]
+    validator = LESSON_TEMPLATES[template][0]
     validate_file = validator(filepath)
     return validate_file.validate()
 
@@ -283,14 +288,29 @@ def _cmd_validate_single(parsed_args_obj):
 
 def _cmd_validate_batch(parsed_arg_obj):
     """Called by argparse to handle a batch of files"""
-    # TODO: Implement
-    raise NotImplementedError
+    search_str = os.path.join(parsed_arg_obj.dir, "*.md")  # Validate files with .md extension
+    filename_list = glob.glob(search_str)
+
+    # Pair of regex and function to call. Will run through all patterns to identify template.
+    all_valid = True
+    for fn in filename_list:
+        for template_name, (validator, pattern) in LESSON_TEMPLATES.iteritems():
+            if re.search(pattern, os.path.basename(fn)):
+                logging.info("Beginning validation of {} using template {}".format(fn, template_name))
+                res = validate_single(fn, template_name)
+                if res is False:
+                    all_valid = False
+                break  # Don't validate the same markdown file against multiple templates
+
+    if all_valid is True:
+        logging.info("All markdown files successfully passed validation.")
+    else:
+        logging.warning("Some files failed validation. See log for details.")
+        sys.exit(1)
 
 
 def start_logging():
-    """Start logging"""
-    # TODO: Allow results to be captured in text files by adding a second logger
-    # TODO: Errors (warning and above) should be sent to stderr
+    """Start logging. Can be modified to control what types of messages are written out, and where"""
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
@@ -299,7 +319,7 @@ def command_line():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
-    # Provide modes to validate a single file vs multiple files
+    # Subparser to validate a single file, and allow the user to choose the template
     single_file_parser = subparsers.add_parser("single", help="Validate one single markdown file")
     single_file_parser.add_argument("file", type=str,
                                     help="The path to the file to validate")
@@ -308,8 +328,10 @@ def command_line():
                                     help="The kind of lesson template to apply")
     single_file_parser.set_defaults(func=_cmd_validate_single)
 
-    # TODO: Implement
+    # Subparser to validate an entire folder, attempting to guess applicable templates
     batch_parser = subparsers.add_parser("batch", help="Validate all files in the project")
+    batch_parser.add_argument("dir",
+                              help="The directory of markdown files to be validated. Will try to auto-detect template.")
     batch_parser.set_defaults(func=_cmd_validate_batch)
 
     return parser.parse_args()
@@ -321,5 +343,5 @@ if __name__ == "__main__":
     parsed_args.func(parsed_args)
 
     #### Sample of how validator is used directly
-    #validator = HomePageValidator('../index.md')
-    #print validator.validate()
+    # validator = HomePageValidator('../index.md')
+    # print validator.validate()
