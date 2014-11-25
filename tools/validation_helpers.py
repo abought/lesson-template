@@ -3,6 +3,11 @@
 
 import json, logging, re, sys
 
+try:  # Hack to make codebase compatible with python 2 and 3
+  basestring
+except NameError:
+  basestring = str
+
 
 #### Common validation functions ###
 def is_list(text):
@@ -86,7 +91,7 @@ class CommonMarkHelper(object):
 
         return links
 
-    def has_section_heading(self, section_title, ast_node=None, limit=sys.maxint, show_msg=True):
+    def has_section_heading(self, section_title, ast_node=None, limit=sys.maxsize, show_msg=True):
         """Does the markdown contain (no more than x copies of) the specified heading text?
         Automatically strips off any CSS attributes when looking for the section title"""
         if ast_node is None:
@@ -104,7 +109,7 @@ class CommonMarkHelper(object):
             logging.info("Verified that document contains the specified heading: {0}".format(section_title))
         return (0 < num_nodes <= limit)
 
-    def has_number_children(self, ast_node, exact=None, minc=0, maxc=sys.maxint):
+    def has_number_children(self, ast_node, exact=None, minc=0, maxc=sys.maxsize):
         """Does the specified node (such as a bulleted list) have the expected number of children?"""
 
         if exact:  # If specified, must have exactly this number of children

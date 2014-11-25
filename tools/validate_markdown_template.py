@@ -12,26 +12,26 @@ This is a command line script that can run on either a single file, or a batch o
 
 Requires the CommonMark package to run. Type
 """
-
+from __future__ import print_function
 import argparse, glob, logging, os, re, sys
+
 
 try:
     import CommonMark
 except ImportError:
-    print "This program requires the CommonMark python package (tested against version 0.5.4)"
-    print "Install using either of the following command line commands:"
-    print "  pip install commonmark"
-    print "  easy_install commonmark"
+    print("This program requires the CommonMark python package (tested against version 0.5.4)")
+    print("Install using either of the following command line commands:")
+    print("  pip install commonmark")
+    print("  easy_install commonmark")
     sys.exit(1)
 
 import validation_helpers as vh
 
 
 class MarkdownValidator(object):
-    """Base class for markdown validation; contains helper methods for working with the CommonMark ast,
-    and basic validation skeleton to be extended for specific page types"""
+    """Base class for markdown validation; contains basic validation skeleton to be extended for specific page types"""
     HEADINGS = []  # List of strings containing expected heading text
-    DOC_HEADERS = {}  # Rows in header section (first few lines of document). Dictionary of {header_label: validation_func}, eg {'keywords': is_list}
+    DOC_HEADERS = {}  # Rows in header section (first few lines of document). Dictionary of {header_label: validation_func}, eg {'minutes': is_numeric}
 
     def __init__(self, filename=None, markdown=None):
         """Pass in the path to a file containing markdown, OR directly pass in a valid markdown string.
@@ -43,7 +43,7 @@ class MarkdownValidator(object):
             with open(filename, 'rU') as f:
                 self.markdown = f.read()
         else:
-            # If not given a file path, look for markdown in ../pages relative to where the script is located
+            # If not given a file path, link checker looks for markdown in ../pages relative to where the script is located
             self.markdown_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
             self.markdown = markdown
 
@@ -57,7 +57,6 @@ class MarkdownValidator(object):
 
     def _validate_hrs(self):
         """Verify that the header section at top of document is bracketed by two horizontal rules"""
-        # The header section should be bracketed by two HRs in the markup
         valid = True
         try:
             hr_nodes = [self.ast.children[0], self.ast.children[2]]
@@ -294,7 +293,7 @@ def _cmd_validate_batch(parsed_arg_obj):
     # Pair of regex and function to call. Will run through all patterns to identify template.
     all_valid = True
     for fn in filename_list:
-        for template_name, (validator, pattern) in LESSON_TEMPLATES.iteritems():
+        for template_name, (validator, pattern) in LESSON_TEMPLATES.items():
             if re.search(pattern, os.path.basename(fn)):
                 logging.info("Beginning validation of {} using template {}".format(fn, template_name))
                 res = validate_single(fn, template_name)
