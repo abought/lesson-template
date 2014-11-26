@@ -269,6 +269,16 @@ LESSON_TEMPLATES = {"index": (IndexPageValidator, "^index"),
                     "instructor": (InstructorPageValidator, "^instructors")}
 
 
+def identify_template(filepath):
+    """Given the path to a single file, identify the appropriate template to use"""
+    for template_name, (validator, pattern) in LESSON_TEMPLATES.items():
+        if re.search(pattern, os.path.basename(filepath)):
+            return template_name  # Will report only one matching template if there are multiple
+
+    # If no match found, explicitly return None
+    return None
+
+
 def validate_single(filepath, template):
     """Validate a single markdown file based on a specified template"""
     validator = LESSON_TEMPLATES[template][0]
@@ -290,16 +300,18 @@ def _cmd_validate_batch(parsed_arg_obj):
     search_str = os.path.join(parsed_arg_obj.dir, "*.md")  # Validate files with .md extension
     filename_list = glob.glob(search_str)
 
-    # Pair of regex and function to call. Will run through all patterns to identify template.
     all_valid = True
     for fn in filename_list:
-        for template_name, (validator, pattern) in LESSON_TEMPLATES.items():
-            if re.search(pattern, os.path.basename(fn)):
-                logging.info("Beginning validation of {} using template {}".format(fn, template_name))
-                res = validate_single(fn, template_name)
-                if res is False:
-                    all_valid = False
-                break  # Don't validate the same markdown file against multiple templates
+        template_name = identify_template(fn)
+        if template_name is None:
+            logging.error("Validation failed: Could not automatically identify correct template to use with {}.".format(fn))
+            continue
+
+        logging.info("Beginning validation of {} using template {}".format(fn, template_name))
+        res = validate_single(fn, template_name)
+
+        if res is False:
+            all_valid = False
 
     if all_valid is True:
         logging.info("All markdown files successfully passed validation.")
