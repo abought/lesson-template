@@ -25,9 +25,6 @@ except ImportError:
 import validation_helpers as vh
 
 
-MARKDOWN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
-
-
 class MarkdownValidator(object):
     """Base class for markdown validation; contains basic validation skeleton to be extended for specific page types"""
     HEADINGS = []  # List of strings containing expected heading text
@@ -44,7 +41,7 @@ class MarkdownValidator(object):
                 self.markdown = f.read()
         else:
             # If not given a file path, link checker looks for markdown in ../pages relative to where the script is located
-            self.markdown_dir = MARKDOWN_DIR
+            self.markdown_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
             self.markdown = markdown
 
         ast = self._parse_markdown(self.markdown)
@@ -304,6 +301,10 @@ def validate_folder(path, template=None):
     search_str = os.path.join(path, "*.md")  # Validate files with .md extension
     filename_list = glob.glob(search_str)
 
+    if not filename_list:
+        logging.error("No markdown files were found in specified directory {}".format(path))
+        return False
+
     all_valid = True
     for fn in filename_list:
         res = validate_single(fn, template=template)
@@ -321,7 +322,7 @@ def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("file_or_path",
                         nargs="*",
-                        default=[MARKDOWN_DIR],
+                        default=[os.getcwd()],
                         help="The individual pathname")
 
     parser.add_argument('-t', '--template',
@@ -352,7 +353,7 @@ if __name__ == "__main__":
     if all_valid is True:
         logging.info("All markdown files successfully passed validation.")
     else:
-        logging.warning("Some files failed validation. See log for details.")
+        logging.warning("Some errors were encountered during validation. See log for details.")
         sys.exit(1)
 
 
