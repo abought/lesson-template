@@ -8,9 +8,6 @@ Validates the presence of headings, as well as specific sub-nodes. Contains vali
 
 This is a command line script that can run on either a single file, or a batch of files.
  Call at command line with flag -h to see options
-
-
-Requires the CommonMark package to run. Type
 """
 from __future__ import print_function
 import argparse, glob, logging, os, re, sys
@@ -26,6 +23,9 @@ except ImportError:
     sys.exit(1)
 
 import validation_helpers as vh
+
+
+MARKDOWN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
 
 
 class MarkdownValidator(object):
@@ -44,7 +44,7 @@ class MarkdownValidator(object):
                 self.markdown = f.read()
         else:
             # If not given a file path, link checker looks for markdown in ../pages relative to where the script is located
-            self.markdown_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
+            self.markdown_dir = MARKDOWN_DIR
             self.markdown = markdown
 
         ast = self._parse_markdown(self.markdown)
@@ -279,45 +279,36 @@ def identify_template(filepath):
     return None
 
 
-def validate_single(filepath, template):
+def validate_single(filepath, template=None):
     """Validate a single markdown file based on a specified template"""
+    template = template or identify_template(filepath)  # If one template name is provided, use that for all files
+    if template is None:
+        logging.error("Validation failed: Could not automatically identify correct template to use with {}".format(filepath))
+        return False
+
+    logging.info("Beginning validation of {} using template {}".format(filepath, template))
     validator = LESSON_TEMPLATES[template][0]
     validate_file = validator(filepath)
-    return validate_file.validate()
 
-
-def _cmd_validate_single(parsed_args_obj):
-    """Called by argparse to handle one single file"""
-    if validate_single(parsed_args_obj.file, parsed_args_obj.template):
-        logging.info("File {} successfully passed validation".format(parsed_args_obj.file))
+    res = validate_file.validate()
+    if res is True:
+        logging.info("File {} successfully passed validation".format(filepath))
     else:
-        logging.info("File {} failed validation: see error log for details".format(parsed_args_obj.file))
-        sys.exit(1)
+        logging.info("File {} failed validation: see error log for details".format(filepath))
+
+    return res
 
 
-def _cmd_validate_batch(parsed_arg_obj):
-    """Called by argparse to handle a batch of files"""
-    search_str = os.path.join(parsed_arg_obj.dir, "*.md")  # Validate files with .md extension
+def validate_folder(path, template=None):
+    """Validate an entire folder of files"""
+    search_str = os.path.join(path, "*.md")  # Validate files with .md extension
     filename_list = glob.glob(search_str)
 
     all_valid = True
     for fn in filename_list:
-        template_name = identify_template(fn)
-        if template_name is None:
-            logging.error("Validation failed: Could not automatically identify correct template to use with {}.".format(fn))
-            continue
-
-        logging.info("Beginning validation of {} using template {}".format(fn, template_name))
-        res = validate_single(fn, template_name)
-
-        if res is False:
-            all_valid = False
-
-    if all_valid is True:
-        logging.info("All markdown files successfully passed validation.")
-    else:
-        logging.warning("Some files failed validation. See log for details.")
-        sys.exit(1)
+        res = validate_single(fn, template=template)
+        all_valid = all_valid and res
+    return all_valid
 
 
 def start_logging():
@@ -328,22 +319,14 @@ def start_logging():
 def command_line():
     """Handle arguments passed in via the command line"""
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
+    parser.add_argument("file_or_path",
+                        nargs="*",
+                        default=[MARKDOWN_DIR],
+                        help="The individual pathname")
 
-    # Subparser to validate a single file, and allow the user to choose the template
-    single_file_parser = subparsers.add_parser("single", help="Validate one single markdown file")
-    single_file_parser.add_argument("file", type=str,
-                                    help="The path to the file to validate")
-    single_file_parser.add_argument("template",
-                                    choices=LESSON_TEMPLATES.keys(),
-                                    help="The kind of lesson template to apply")
-    single_file_parser.set_defaults(func=_cmd_validate_single)
-
-    # Subparser to validate an entire folder, attempting to guess applicable templates
-    batch_parser = subparsers.add_parser("batch", help="Validate all files in the project")
-    batch_parser.add_argument("dir",
-                              help="The directory of markdown files to be validated. Will try to auto-detect template.")
-    batch_parser.set_defaults(func=_cmd_validate_batch)
+    parser.add_argument('-t', '--template',
+                        choices=LESSON_TEMPLATES.keys(),
+                        help="The type of lesson template to apply to all file(s). If not specified, will auto-identify template.")
 
     return parser.parse_args()
 
@@ -351,7 +334,27 @@ def command_line():
 if __name__ == "__main__":
     start_logging()
     parsed_args = command_line()
-    parsed_args.func(parsed_args)
+
+    template = parsed_args.template  # Can specify multiple files and/or folders at command line
+
+    all_valid = True
+    for e in parsed_args.file_or_path:
+        if os.path.isdir(e):
+            res = validate_folder(e, template=template)
+        elif os.path.isfile(e):
+            res = validate_single(e, template=template)
+        else:
+            res = False
+            logging.error("The specified file or folder {} does not exist; could not perform validation".format(e))
+
+        all_valid = all_valid and res
+
+    if all_valid is True:
+        logging.info("All markdown files successfully passed validation.")
+    else:
+        logging.warning("Some files failed validation. See log for details.")
+        sys.exit(1)
+
 
     #### Sample of how validator is used directly
     # validator = HomePageValidator('../index.md')
