@@ -16,13 +16,13 @@ class BaseTemplateTest(unittest.TestCase):
 
     def _create_validator(self, markdown):
         """Create validator object from markdown string; useful for failures"""
-        return validate_markdown_template.HomePageValidator(markdown=markdown)
+        return validate_markdown_template.IndexPageValidator(markdown=markdown)
 
 
-class TestHomePage(BaseTemplateTest):
+class TestIndexPage(BaseTemplateTest):
     """Test the ability to correctly identify and validate specific sections of a markdown file"""
     SAMPLE_FILE = "../pages/index.md"
-    VALIDATOR = validate_markdown_template.HomePageValidator
+    VALIDATOR = validate_markdown_template.IndexPageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_file.validate()
@@ -131,6 +131,26 @@ class TestTopicPage(BaseTemplateTest):
         self.assertTrue(res)
 
 
+class TestMotivationPage(BaseTemplateTest):
+    """Verifies that the instructors page validator works as expected"""
+    SAMPLE_FILE = "../pages/motivation.md"
+    VALIDATOR = validate_markdown_template.MotivationPageValidator
+
+    def test_sample_file_passes_validation(self):
+        res = self.sample_file.validate()
+        self.assertTrue(res)
+
+
+class TestReferencePage(BaseTemplateTest):
+    """Verifies that the instructors page validator works as expected"""
+    SAMPLE_FILE = "../pages/reference.md"
+    VALIDATOR = validate_markdown_template.ReferencePageValidator
+
+    def test_sample_file_passes_validation(self):
+        res = self.sample_file.validate()
+        self.assertTrue(res)
+
+
 class TestInstructorPage(BaseTemplateTest):
     """Verifies that the instructors page validator works as expected"""
     SAMPLE_FILE = "../pages/instructors.md"
@@ -139,6 +159,7 @@ class TestInstructorPage(BaseTemplateTest):
     def test_sample_file_passes_validation(self):
         res = self.sample_file.validate()
         self.assertTrue(res)
+
 
 if __name__ == "__main__":
     unittest.main()

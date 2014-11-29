@@ -8,45 +8,40 @@ Validates the presence of headings, as well as specific sub-nodes. Contains vali
 
 This is a command line script that can run on either a single file, or a batch of files.
  Call at command line with flag -h to see options
-
-
-Requires the CommonMark package to run. Type
 """
+from __future__ import print_function
+import argparse, glob, logging, os, re, sys
 
-import argparse, logging, os, re, sys
 
 try:
     import CommonMark
 except ImportError:
-    print "This program requires the CommonMark python package (tested against version 0.5.4)"
-    print "Install using either of the following command line commands:"
-    print "  pip install commonmark"
-    print "  easy_install commonmark"
-    exit(1)
+    print("This program requires the CommonMark python package (tested against version 0.5.4)")
+    print("Install using either of the following command line commands:")
+    print("  pip install commonmark")
+    print("  easy_install commonmark")
+    sys.exit(1)
 
 import validation_helpers as vh
 
-# Path to where markdown files are stored: relative to this file, should be ../pages
-MARKDOWN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
-
-
-GLOBAL_CSS_CLASSES = []  # TODO: Write validator for CSS classes in document
-
 
 class MarkdownValidator(object):
-    """Base class for markdown validation; contains helper methods for working with the CommonMark ast,
-    and basic validation skeleton to be extended for specific page types"""
+    """Base class for markdown validation; contains basic validation skeleton to be extended for specific page types"""
     HEADINGS = []  # List of strings containing expected heading text
-    DOC_HEADERS = {}  # Rows in header section (first few lines of document). Dictionary of {header_label: validation_func}, eg {'keywords': is_list}
+    DOC_HEADERS = {}  # Rows in header section (first few lines of document). Dictionary of {header_label: validation_func}, eg {'minutes': is_numeric}
 
     def __init__(self, filename=None, markdown=None):
         """Pass in the path to a file containing markdown, OR directly pass in a valid markdown string.
             The latter is useful for unit testing."""
         self.filename = filename
+
         if filename:
+            self.markdown_dir = os.path.dirname(filename)  # When checking links, expect markdown files to be in same directory as the input file
             with open(filename, 'rU') as f:
                 self.markdown = f.read()
         else:
+            # If not given a file path, link checker looks for markdown in ../pages relative to where the script is located
+            self.markdown_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "pages"))
             self.markdown = markdown
 
         ast = self._parse_markdown(self.markdown)
@@ -59,7 +54,6 @@ class MarkdownValidator(object):
 
     def _validate_hrs(self):
         """Verify that the header section at top of document is bracketed by two horizontal rules"""
-        # The header section should be bracketed by two HRs in the markup
         valid = True
         try:
             hr_nodes = [self.ast.children[0], self.ast.children[2]]
@@ -146,7 +140,7 @@ class MarkdownValidator(object):
         for link in links:
             if re.match(r"^[\w,\s-]+\.(htm|html)$", link):  # This is a filename (not a web link), so confirm file exists
                 expected_md_filename = os.path.splitext(link)[0] + os.extsep + "md"
-                expected_md_path = os.path.join(MARKDOWN_DIR, expected_md_filename)
+                expected_md_path = os.path.join(self.markdown_dir, expected_md_filename)
                 if not os.path.isfile(expected_md_path):
                     logging.error("The document links to {0}, but could not find the expected markdown file {1}".format(
                         link, expected_md_path))
@@ -170,7 +164,7 @@ class MarkdownValidator(object):
             return False
 
 
-class HomePageValidator(MarkdownValidator):
+class IndexPageValidator(MarkdownValidator):
     """Validate the contents of the homepage (index.md)"""
     HEADINGS = ['Topics',
                 'Other Resources']
@@ -198,7 +192,7 @@ class HomePageValidator(MarkdownValidator):
 
     def _run_tests(self):
         tests = [self._validate_intro_section()]
-        parent_tests = super(HomePageValidator, self)._run_tests()
+        parent_tests = super(IndexPageValidator, self)._run_tests()
         return all(tests) and parent_tests
 
 
@@ -240,12 +234,19 @@ class TopicPageValidator(MarkdownValidator):
         return all(tests) and parent_tests
 
 
-class IntroPageValidator(MarkdownValidator):
-    pass
+class MotivationPageValidator(MarkdownValidator):
+    """Validate motivation.md"""
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str}
+    # TODO: Find out what validation is needed. This file might be a mix of reveal.js (HTML) + markdown
 
 
 class ReferencePageValidator(MarkdownValidator):
-    pass
+    """Validate reference.md"""
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str,
+                   "subtitle": vh.is_str}
+    HEADINGS = ["Glossary"]
 
 
 class InstructorPageValidator(MarkdownValidator):
@@ -257,59 +258,76 @@ class InstructorPageValidator(MarkdownValidator):
 
 
 # Associate lesson template names with validators. Master list of templates recognized by CLI.
-LESSON_TEMPLATES = {"home": HomePageValidator,
-                    "topic": TopicPageValidator,
-                    "intro": IntroPageValidator,
-                    "reference": ReferencePageValidator,
-                    "instructor": InstructorPageValidator}
+#   Dict of {name: (Validator, filename_pattern)}
+LESSON_TEMPLATES = {"index": (IndexPageValidator, "^index"),
+                    "topic": (TopicPageValidator, "^[0-9]{2}-.*"),
+                    "motivation": (MotivationPageValidator, "^motivation"),
+                    "reference": (ReferencePageValidator, "^reference"),
+                    "instructor": (InstructorPageValidator, "^instructors")}
 
 
-def validate_single(filepath, template):
+def identify_template(filepath):
+    """Given the path to a single file, identify the appropriate template to use"""
+    for template_name, (validator, pattern) in LESSON_TEMPLATES.items():
+        if re.search(pattern, os.path.basename(filepath)):
+            return template_name  # Will report only one matching template if there are multiple
+
+    # If no match found, explicitly return None
+    return None
+
+
+def validate_single(filepath, template=None):
     """Validate a single markdown file based on a specified template"""
-    validator = LESSON_TEMPLATES[template]
+    template = template or identify_template(filepath)  # If one template name is provided, use that for all files
+    if template is None:
+        logging.error("Validation failed: Could not automatically identify correct template to use with {}".format(filepath))
+        return False
+
+    logging.info("Beginning validation of {} using template {}".format(filepath, template))
+    validator = LESSON_TEMPLATES[template][0]
     validate_file = validator(filepath)
-    return validate_file.validate()
 
-
-def _cmd_validate_single(parsed_args_obj):
-    """Called by argparse to handle one single file"""
-    if validate_single(parsed_args_obj.file, parsed_args_obj.template):
-        logging.info("File {} successfully passed validation".format(parsed_args_obj.file))
+    res = validate_file.validate()
+    if res is True:
+        logging.info("File {} successfully passed validation".format(filepath))
     else:
-        logging.info("File {} failed validation: see error log for details".format(parsed_args_obj.file))
-        sys.exit(1)
+        logging.info("File {} failed validation: see error log for details".format(filepath))
+
+    return res
 
 
-def _cmd_validate_batch(parsed_arg_obj):
-    """Called by argparse to handle a batch of files"""
-    # TODO: Implement
-    raise NotImplementedError
+def validate_folder(path, template=None):
+    """Validate an entire folder of files"""
+    search_str = os.path.join(path, "*.md")  # Validate files with .md extension
+    filename_list = glob.glob(search_str)
+
+    if not filename_list:
+        logging.error("No markdown files were found in specified directory {}".format(path))
+        return False
+
+    all_valid = True
+    for fn in filename_list:
+        res = validate_single(fn, template=template)
+        all_valid = all_valid and res
+    return all_valid
 
 
 def start_logging():
-    """Start logging"""
-    # TODO: Allow results to be captured in text files by adding a second logger
-    # TODO: Errors (warning and above) should be sent to stderr
+    """Start logging. Can be modified to control what types of messages are written out, and where"""
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 def command_line():
     """Handle arguments passed in via the command line"""
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
+    parser.add_argument("file_or_path",
+                        nargs="*",
+                        default=[os.getcwd()],
+                        help="The individual pathname")
 
-    # Provide modes to validate a single file vs multiple files
-    single_file_parser = subparsers.add_parser("single", help="Validate one single markdown file")
-    single_file_parser.add_argument("file", type=str,
-                                    help="The path to the file to validate")
-    single_file_parser.add_argument("template",
-                                    choices=LESSON_TEMPLATES.keys(),
-                                    help="The kind of lesson template to apply")
-    single_file_parser.set_defaults(func=_cmd_validate_single)
-
-    # TODO: Implement
-    batch_parser = subparsers.add_parser("batch", help="Validate all files in the project")
-    batch_parser.set_defaults(func=_cmd_validate_batch)
+    parser.add_argument('-t', '--template',
+                        choices=LESSON_TEMPLATES.keys(),
+                        help="The type of lesson template to apply to all file(s). If not specified, will auto-identify template.")
 
     return parser.parse_args()
 
@@ -317,8 +335,28 @@ def command_line():
 if __name__ == "__main__":
     start_logging()
     parsed_args = command_line()
-    parsed_args.func(parsed_args)
+
+    template = parsed_args.template  # Can specify multiple files and/or folders at command line
+
+    all_valid = True
+    for e in parsed_args.file_or_path:
+        if os.path.isdir(e):
+            res = validate_folder(e, template=template)
+        elif os.path.isfile(e):
+            res = validate_single(e, template=template)
+        else:
+            res = False
+            logging.error("The specified file or folder {} does not exist; could not perform validation".format(e))
+
+        all_valid = all_valid and res
+
+    if all_valid is True:
+        logging.info("All markdown files successfully passed validation.")
+    else:
+        logging.warning("Some errors were encountered during validation. See log for details.")
+        sys.exit(1)
+
 
     #### Sample of how validator is used directly
-    #validator = HomePageValidator('../index.md')
-    #print validator.validate()
+    # validator = HomePageValidator('../index.md')
+    # print validator.validate()
