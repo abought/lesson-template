@@ -12,7 +12,7 @@ class BaseTemplateTest(unittest.TestCase):
     VALIDATOR = validate_markdown_template.MarkdownValidator
 
     def setUp(self):
-        self.sample_file = self.VALIDATOR(self.SAMPLE_FILE)
+        self.sample_validator = self.VALIDATOR(self.SAMPLE_FILE)
 
     def _create_validator(self, markdown):
         """Create validator object from markdown string; useful for failures"""
@@ -25,7 +25,7 @@ class TestIndexPage(BaseTemplateTest):
     VALIDATOR = validate_markdown_template.IndexPageValidator
 
     def test_sample_file_passes_validation(self):
-        res = self.sample_file.validate()
+        res = self.sample_validator.validate()
         self.assertTrue(res)
 
     def test_headers_missing_hrs(self):
@@ -38,7 +38,7 @@ keywords: ["some", "key terms", "in a list"]
 Another section that isn't an HR
 """)
 
-        self.assertEqual(validator._validate_doc_headers(), False)
+        self.assertFalse(validator._validate_doc_headers())
 
     def test_headers_missing_a_line(self):
         """One of the required headers is missing"""
@@ -46,7 +46,7 @@ Another section that isn't an HR
 layout: lesson
 keywords: ["some", "key terms", "in a list"]
 ---""")
-        self.assertEqual(validator._validate_doc_headers(), False)
+        self.assertFalse(validator._validate_doc_headers())
 
     def test_headers_fail_with_other_content(self):
         validator = self._create_validator("""---
@@ -55,7 +55,7 @@ title: Lesson Title
 keywords: ["some", "key terms", "in a list"]
 otherline: Nothing
 ---""")
-        self.assertEqual(validator._validate_doc_headers(), False)
+        self.assertFalse(validator._validate_doc_headers())
 
     def test_headers_fail_because_invalid_content(self):
         validator = self._create_validator("""---
@@ -63,35 +63,35 @@ layout: lesson
 title: Lesson Title
 keywords: this is not a list
 ---""")
-        self.assertEqual(validator._validate_doc_headers(), False)
+        self.assertFalse(validator._validate_doc_headers())
 
     def test_index_has_valid_section_headings(self):
         """The provided index page"""
-        res = self.sample_file._validate_section_heading_order()
-        self.assertEqual(res, True)
+        res = self.sample_validator._validate_section_heading_order()
+        self.assertTrue(res)
 
     def test_file_links_validate(self):
-        res = self.sample_file._validate_links()
-        self.assertEqual(res, True)
+        res = self.sample_validator._validate_links()
+        self.assertTrue(res)
 
     def test_missing_file_fails_validation(self):
         """Fail validation when an html file is linked without corresponding markdown file"""
         validator = self._create_validator("""[Broken link](nonexistent.html)""")
-        self.assertEqual(validator._validate_links(), False)
+        self.assertFalse(validator._validate_links())
 
     def test_website_link_ignored_by_validator(self):
         """Don't look for markdown if the file linked isn't local- remote website links are ignored"""
         validator = self._create_validator("""[Broken link](http://website.com/filename.html)""")
-        self.assertEqual(validator._validate_links(), True)
+        self.assertTrue(validator._validate_links())
 
     def test_non_html_link_ignored_by_validator(self):
         """Don't look for markdown if the file linked isn't an html file"""
         validator = self._create_validator("""[Broken link](nonexistent.txt)""")
-        self.assertEqual(validator._validate_links(), True)
+        self.assertTrue(validator._validate_links())
 
     def test_index_fail_when_section_heading_absent(self):
-        res = self.sample_file.ast.has_section_heading("Fake heading")
-        self.assertEqual(res, False)
+        res = self.sample_validator.ast.has_section_heading("Fake heading")
+        self.assertFalse(res)
 
     def test_fail_when_section_headings_in_wrong_order(self):
         validator = self._create_validator("""---
@@ -118,7 +118,7 @@ Paragraph of introductory material.
 * [Topic Title 1](01-one.html)
 * [Topic Title 2](02-two.html)""")
 
-        self.assertEqual(validator._validate_section_heading_order(), False)
+        self.assertFalse(validator._validate_section_heading_order())
 
 
 class TestTopicPage(BaseTemplateTest):
@@ -127,7 +127,7 @@ class TestTopicPage(BaseTemplateTest):
     VALIDATOR = validate_markdown_template.TopicPageValidator
 
     def test_sample_file_passes_validation(self):
-        res = self.sample_file.validate()
+        res = self.sample_validator.validate()
         self.assertTrue(res)
 
 
@@ -137,7 +137,7 @@ class TestMotivationPage(BaseTemplateTest):
     VALIDATOR = validate_markdown_template.MotivationPageValidator
 
     def test_sample_file_passes_validation(self):
-        res = self.sample_file.validate()
+        res = self.sample_validator.validate()
         self.assertTrue(res)
 
 
@@ -147,7 +147,7 @@ class TestReferencePage(BaseTemplateTest):
     VALIDATOR = validate_markdown_template.ReferencePageValidator
 
     def test_sample_file_passes_validation(self):
-        res = self.sample_file.validate()
+        res = self.sample_validator.validate()
         self.assertTrue(res)
 
 
@@ -157,7 +157,32 @@ class TestInstructorPage(BaseTemplateTest):
     VALIDATOR = validate_markdown_template.InstructorPageValidator
 
     def test_sample_file_passes_validation(self):
-        res = self.sample_file.validate()
+        res = self.sample_validator.validate()
+        self.assertTrue(res)
+
+
+class TestLicensePage(BaseTemplateTest):
+    SAMPLE_FILE = '../pages/LICENSE.md'
+    VALIDATOR = validate_markdown_template.LicensePageValidator
+
+    def test_sample_file_passes_validation(self):
+        res = self.sample_validator.validate()
+        self.assertTrue(res)
+
+    def test_modified_file_fails_validation(self):
+        with open(self.SAMPLE_FILE, 'rU') as f:
+            orig_text = f.read()
+        mod_text = orig_text.replace("The", "the")
+        validator = self._create_validator(mod_text)
+        self.assertFalse(validator.validate())
+
+
+class TestDiscussionPage(BaseTemplateTest):
+    SAMPLE_FILE = '../pages/discussion.md'
+    VALIDATOR = validate_markdown_template.DiscussionPageValidator
+
+    def test_sample_file_passes_validation(self):
+        res = self.sample_validator.validate()
         self.assertTrue(res)
 
 

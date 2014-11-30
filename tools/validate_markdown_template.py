@@ -10,7 +10,7 @@ This is a command line script that can run on either a single file, or a batch o
  Call at command line with flag -h to see options
 """
 from __future__ import print_function
-import argparse, glob, logging, os, re, sys
+import argparse, glob, hashlib, logging, os, re, sys
 
 
 try:
@@ -257,13 +257,37 @@ class InstructorPageValidator(MarkdownValidator):
                    "subtitle": vh.is_str}
 
 
+class LicensePageValidator(MarkdownValidator):
+    """Validate LICENSE.md: user should not edit this file"""
+    def _run_tests(self):
+        """Skip the base tests; just check md5 hash"""
+        expected_hash = '258aa6822fa77f7c49c37c3759017891' # TODO: For english language file
+        m = hashlib.md5()
+        m.update(self.markdown)
+
+        if (m.hexdigest() == expected_hash):
+            return True
+        else:
+            logging.error("The license file provided in the repository should not be modified.")
+            return False
+
+
+class DiscussionPageValidator(MarkdownValidator):
+    """Validate the discussion page (discussion.md). Most of the content is free-form"""
+    DOC_HEADERS = {"layout": vh.is_str,
+                   "title": vh.is_str,
+                   "subtitle": vh.is_str}
+
+
 # Associate lesson template names with validators. Master list of templates recognized by CLI.
 #   Dict of {name: (Validator, filename_pattern)}
 LESSON_TEMPLATES = {"index": (IndexPageValidator, "^index"),
                     "topic": (TopicPageValidator, "^[0-9]{2}-.*"),
                     "motivation": (MotivationPageValidator, "^motivation"),
                     "reference": (ReferencePageValidator, "^reference"),
-                    "instructor": (InstructorPageValidator, "^instructors")}
+                    "instructor": (InstructorPageValidator, "^instructors"),
+                    "license": (LicensePageValidator, "^LICENSE"),
+                    "discussion": (DiscussionPageValidator, "^discussion")}
 
 
 def identify_template(filepath):
