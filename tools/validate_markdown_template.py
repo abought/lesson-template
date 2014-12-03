@@ -28,6 +28,8 @@ import validation_helpers as vh
 class MarkdownValidator(object):
     """Base class for markdown validation; contains basic validation skeleton to be extended for specific page types"""
     HEADINGS = []  # List of strings containing expected heading text
+    WARN_ON_EXTRA_HEADINGS = True  # Should a warning be printed when other headings are present?
+
     DOC_HEADERS = {}  # Rows in header section (first few lines of document). Dictionary of {header_label: validation_func}, eg {'minutes': is_numeric}
 
     def __init__(self, filename=None, markdown=None):
@@ -51,6 +53,14 @@ class MarkdownValidator(object):
         parser = CommonMark.DocParser()
         ast = parser.parse(markdown)
         return ast
+
+    def _validate_line_length(self):
+        """No line should be greater than 80 characters in length"""
+        lines = self.markdown.splitlines()
+        res = not any(len(l) > 80 for l in lines)
+        if res is False:
+            logging.error("No line in the file should be more than 80 characters in length")
+        return res
 
     def _validate_hrs(self):
         """Verify that the header section at top of document is bracketed by two horizontal rules"""
@@ -119,8 +129,12 @@ class MarkdownValidator(object):
         for h in missing_headings:
             logging.error("Document does not contain the expected headings: {0}".format(h))
 
-        for h in extra_headings:
-            logging.warning("Document contains additional heading not specified in the template: {0}".format(h))
+        if self.WARN_ON_EXTRA_HEADINGS is True:
+            for h in extra_headings:
+                logging.error("Document contains additional heading not specified in the template: {0}".format(h))
+            no_extra = (len(extra_headings) == 0)
+        else:
+            no_extra = False
 
         # Check that the subset of headings in the template spec matches order in the document
         valid_order = True
@@ -129,7 +143,34 @@ class MarkdownValidator(object):
             valid_order = False
             logging.error("Document headings do not match the order specified by the template")
 
-        return (len(missing_headings) == 0 and valid_order)
+        return (len(missing_headings) == 0 and valid_order and no_extra)
+
+    def _validate_one_link(self, link_node):
+        """Logic to validate a single link"""
+
+        dest, link_text = self.ast.get_link_info(link_node)
+
+        if re.match(r"^[\w,\s-]+\.(htm|html)$", dest):  # This is a filename (not a web link), so confirm file exists
+            expected_md_filename = os.path.splitext(dest)[0] + os.extsep + "md"
+            expected_md_path = os.path.join(self.markdown_dir, expected_md_filename)
+            if not os.path.isfile(expected_md_path):
+                logging.error("The document links to {0}, but could not find the expected markdown file {1}".format(
+                    dest, expected_md_path))
+                return False
+
+            # If file exists, parse and validate link text = node title
+            with open(expected_md_path, 'rU') as link_dest_file:
+                dest_contents = link_dest_file.read()
+
+            dest_ast = self._parse_markdown(dest_contents)
+            dest_ast = vh.CommonMarkHelper(dest_ast)
+            dest_page_title = dest_ast.get_doc_header_title()
+
+            if dest_page_title != link_text:
+                logging.error("The linked page {0} exists, but the link text '{1}' does not match the title of that page, '{2}'.".format(dest, link_text, dest_page_title))
+                return False
+
+        return True
 
     def _validate_links(self):
         """Validate all links: assumption is that any local html file being linked was generated as part of the lesson
@@ -137,19 +178,15 @@ class MarkdownValidator(object):
         links = self.ast.find_links()
 
         valid = True
-        for link in links:
-            if re.match(r"^[\w,\s-]+\.(htm|html)$", link):  # This is a filename (not a web link), so confirm file exists
-                expected_md_filename = os.path.splitext(link)[0] + os.extsep + "md"
-                expected_md_path = os.path.join(self.markdown_dir, expected_md_filename)
-                if not os.path.isfile(expected_md_path):
-                    logging.error("The document links to {0}, but could not find the expected markdown file {1}".format(
-                        link, expected_md_path))
-                    valid = False
+        for link_node in links:
+            res = self._validate_one_link(link_node)
+            valid = valid and res
         return valid
 
     def _run_tests(self):
         """Let user override the tests here, so that errors and exceptions can be captured by validate method"""
-        tests = [self._validate_doc_headers(),
+        tests = [self._validate_line_length(),
+                 self._validate_doc_headers(),
                  self._validate_section_heading_order(),
                  self._validate_links()]
 
@@ -252,6 +289,7 @@ class ReferencePageValidator(MarkdownValidator):
 class InstructorPageValidator(MarkdownValidator):
     """Simple validator for Instructor's Guide- instructors.md"""
     HEADINGS = ["Legend", "Overall"]
+    WARN_ON_EXTRA_HEADINGS = False
     DOC_HEADERS = {"layout": vh.is_str,
                    "title": vh.is_str,
                    "subtitle": vh.is_str}

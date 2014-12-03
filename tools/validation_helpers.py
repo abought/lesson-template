@@ -55,6 +55,18 @@ class CommonMarkHelper(object):
         self.data = ast
         self.children = self.data.children
 
+    def get_doc_header_title(self):
+        """Helper method for SWC templates: get the document title from the YAML headers"""
+        doc_headers = self.data.children[1]  # Throw index error if none found
+
+        for s in doc_headers.strings:
+            label, contents = s.split(":", 1)
+            if label.lower() == "title":
+                return contents.strip()
+
+        # If title not found, explicitly return None
+        return None
+
     def get_block_titled(self, title, ast_node=None):
         """Examine children. Return all children of the given node that:
         a) are blockquoted elements, and
@@ -73,17 +85,30 @@ class CommonMarkHelper(object):
             ast_node = self.data
         return [n for n in ast_node.children if self.is_heading(n)]
 
+    def get_link_info(self, link_node):
+        """Given a link node, return the link title and destination"""
+        if not self.is_link(link_node):
+            raise TypeError("Cannot apply this method to something that is not a link")
+
+        dest = link_node.destination
+        try:
+            link_text = link_node.label[0].c
+        except:
+            link_text = None
+
+        return dest, link_text
+
     def find_links(self, ast_node=None):
         """Recursive function that locates all hyperlinks under the specified node.
         Returns a list specifying the destination of each link"""
         ast_node = ast_node or self.data
 
-        # Links can be hiding in this node in two ways
-        links = [n.destination
-                 for n in ast_node.inline_content if self.is_link(n)]
+        # Link can be node itself, or hiding in inline content
+        links = [n for n in ast_node.inline_content
+                 if self.is_link(n)]
 
         if self.is_link(ast_node):
-            links.append(ast_node.destination)
+            links.append(ast_node)
 
         # Also look for links in sub-nodes
         for n in ast_node.children:

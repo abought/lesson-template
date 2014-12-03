@@ -19,6 +19,20 @@ class BaseTemplateTest(unittest.TestCase):
         return validate_markdown_template.IndexPageValidator(markdown=markdown)
 
 
+class TestAstHelpers(BaseTemplateTest):
+    SAMPLE_FILE = '../pages/index.md'
+    VALIDATOR = validate_markdown_template.MarkdownValidator
+
+    def test_link_text_extracted(self):
+        """Verify that link text and destination are extracted correctly"""
+        validator = self._create_validator("""[This is a link](discussion.html)""")
+        links = validator.ast.find_links(validator.ast.children[0])
+
+        dest, link_text = validator.ast.get_link_info(links[0])
+        self.assertEqual(dest, "discussion.html")
+        self.assertEqual(link_text, "This is a link")
+
+
 class TestIndexPage(BaseTemplateTest):
     """Test the ability to correctly identify and validate specific sections of a markdown file"""
     SAMPLE_FILE = "../pages/index.md"
@@ -27,6 +41,15 @@ class TestIndexPage(BaseTemplateTest):
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
         self.assertTrue(res)
+
+    def test_long_line_fails_test(self):
+        validator = self._create_validator("""123456789012345678901234567890123456789012345678901234567890123456789012345678901""")
+        self.assertFalse(validator._validate_line_length())
+
+    def test_short_line_ok(self):
+        """<= 80 char line length is ok"""
+        validator = self._create_validator("""12345678901234567890123456789012345678901234567890123456789012345678901234567890""")
+        self.assertTrue(validator._validate_line_length())
 
     def test_headers_missing_hrs(self):
         validator = self._create_validator("""Blank row
