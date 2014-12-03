@@ -172,15 +172,16 @@ class MarkdownValidator(object):
         return (len(missing_headings) == 0 and valid_order and no_extra)
 
     def _validate_one_link(self, link_node):
-        """Logic to validate a single link
+        """Logic to validate a single external asset (image or link)
 
         Any local html file being linked was generated as part of the lesson.
         Therefore, file links (.html) must have a Markdown file
             in the expected folder.
 
         The title of the linked Markdown document should match the link text.
-        """
 
+        For other assets (links or images), just verify that a file exists
+        """
         dest, link_text = self.ast.get_link_info(link_node)
 
         if re.match(r"^[\w,\s-]+\.(html?)", dest, re.IGNORECASE):
@@ -209,7 +210,7 @@ class MarkdownValidator(object):
                                   dest, link_text, dest_page_title))
                 return False
         elif not re.match(r"^((https?|ftp)://)", dest, re.IGNORECASE):
-            # If not web URL, verify that file exists
+            # If not web URL, verify that local file exists
             dest_path = os.path.join(self.lesson_dir, dest)
             if not os.path.isfile(dest_path):
                 logging.error("Could not find the linked asset file "
@@ -222,8 +223,11 @@ class MarkdownValidator(object):
         return True
 
     def _validate_links(self):
-        """Validate all links in the document"""
-        links = self.ast.find_links()
+        """Validate all references to external content
+
+        This includes links AND images: these are the two types of node that
+          CommonMark assigns a .destination property"""
+        links = self.ast.find_external_links()
 
         valid = True
         for link_node in links:

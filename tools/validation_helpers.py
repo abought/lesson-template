@@ -95,7 +95,7 @@ class CommonMarkHelper(object):
 
     def get_link_info(self, link_node):
         """Given a link node, return the link title and destination"""
-        if not self.is_link(link_node):
+        if not self.is_external(link_node):
             raise TypeError("Cannot apply this method to something that is not a link")
 
         dest = link_node.destination
@@ -106,21 +106,21 @@ class CommonMarkHelper(object):
 
         return dest, link_text
 
-    def find_links(self, ast_node=None):
-        """Recursive function that locates all hyperlinks under specified node
-        Returns a list specifying the destination of each link"""
+    def find_external_links(self, ast_node=None):
+        """Recursive function that locates all references to external content
+         under specified node. (links or images)"""
         ast_node = ast_node or self.data
 
         # Link can be node itself, or hiding in inline content
         links = [n for n in ast_node.inline_content
-                 if self.is_link(n)]
+                 if self.is_external(n)]
 
-        if self.is_link(ast_node):
+        if self.is_external(ast_node):
             links.append(ast_node)
 
         # Also look for links in sub-nodes
         for n in ast_node.children:
-            links.extend(self.find_links(n))
+            links.extend(self.find_external_links(n))
 
         return links
 
@@ -177,6 +177,10 @@ class CommonMarkHelper(object):
     def is_link(self, ast_node):
         """Is the node a link?"""
         return ast_node.t == "Link"
+
+    def is_external(self, ast_node):
+        """Does the node reference content outside the file? (image or link)"""
+        return ast_node.t in ("Link", "Image")
 
     def is_block(self, ast_node):
         """Is the node a BlockQuoted element?"""

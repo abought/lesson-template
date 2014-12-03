@@ -28,7 +28,7 @@ class TestAstHelpers(BaseTemplateTest):
     def test_link_text_extracted(self):
         """Verify that link text and destination are extracted correctly"""
         validator = self._create_validator("""[This is a link](discussion.html)""")
-        links = validator.ast.find_links(validator.ast.children[0])
+        links = validator.ast.find_external_links(validator.ast.children[0])
 
         dest, link_text = validator.ast.get_link_info(links[0])
         self.assertEqual(dest, "discussion.html")
@@ -188,10 +188,17 @@ Paragraph of introductory material.
         validator = self._create_validator("""[Broken link](www.website.com/filename.html)""")
         self.assertFalse(validator._validate_links())
 
-    def test_non_html_link_finds_svg(self):
+    def test_finds_image_asset(self):
+        """Image asset is found"""
         validator = self._create_validator(
             """![this is the image's title](fig/example.svg "this is the image's alt text")""")
         self.assertTrue(validator._validate_links())
+
+    def test_image_asset_not_found(self):
+        """Image asset can't be found if path is invalid"""
+        validator = self._create_validator(
+            """![this is the image's title](fig/exemple.svg "this is the image's alt text")""")
+        self.assertFalse(validator._validate_links())
 
     def test_non_html_link_finds_csv(self):
         """Look for CSV file in appropriate folder"""
@@ -200,14 +207,10 @@ Paragraph of introductory material.
         self.assertTrue(validator._validate_links())
 
     def test_non_html_links_are_path_sensitive(self):
+        """Fails to find CSV file with wrong path."""
         validator = self._create_validator(
             """Use [this CSV](data.csv) for the exercise.""")
         self.assertFalse(validator._validate_links())
-
-    def test_non_html_broken_link_fails(self):
-        validator = self._create_validator(
-            """![this is the image's title](fig/exemple.svg "this is the image's alt text")""")
-        self.assertTrue(validator._validate_links())
 
 
 class TestTopicPage(BaseTemplateTest):
