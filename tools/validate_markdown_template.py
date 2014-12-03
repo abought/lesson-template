@@ -359,9 +359,13 @@ class LicensePageValidator(MarkdownValidator):
         # TODO: This hash is specific to the license for english-language repo
         expected_hash = '258aa6822fa77f7c49c37c3759017891'
         m = hashlib.md5()
-        m.update(self.markdown)
+        try:
+            m.update(self.markdown)
+        except TypeError:
+            # Workaround for hashing in python3
+            m.update(self.markdown.encode('utf-8'))
 
-        if (m.hexdigest() == expected_hash):
+        if m.hexdigest() == expected_hash:
             return True
         else:
             logging.error("The provided license file should not be modified.")

@@ -42,15 +42,6 @@ class TestIndexPage(BaseTemplateTest):
         res = self.sample_validator.validate()
         self.assertTrue(res)
 
-    def test_long_line_fails_test(self):
-        validator = self._create_validator("""123456789012345678901234567890123456789012345678901234567890123456789012345678901""")
-        self.assertFalse(validator._validate_line_length())
-
-    def test_short_line_ok(self):
-        """<= 80 char line length is ok"""
-        validator = self._create_validator("""12345678901234567890123456789012345678901234567890123456789012345678901234567890""")
-        self.assertTrue(validator._validate_line_length())
-
     def test_headers_missing_hrs(self):
         validator = self._create_validator("""Blank row
 
