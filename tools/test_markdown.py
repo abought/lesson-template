@@ -1,10 +1,11 @@
 #! /usr/bin/env python
 
-import imp, os, unittest
+import imp, logging, os, unittest
 check = imp.load_source("check",  # Import non-.py file
                         os.path.join(os.path.dirname(__file__), "check"))
 
-check.start_logging()  # Make log messages visible to help audit test failures
+# Make log messages visible to help audit test failures
+check.start_logging(level=logging.DEBUG)
 
 
 class BaseTemplateTest(unittest.TestCase):
@@ -64,6 +65,7 @@ keywords: ["some", "key terms", "in a list"]
 ---""")
         self.assertFalse(validator._validate_doc_headers())
 
+    # TESTS INVOLVING DOCUMENT HEADER SECTION
     def test_headers_fail_with_other_content(self):
         validator = self._create_validator("""---
 layout: lesson
@@ -81,33 +83,11 @@ keywords: this is not a list
 ---""")
         self.assertFalse(validator._validate_doc_headers())
 
+    # TESTS INVOLVING SECTION TITLES/HEADINGS
     def test_index_has_valid_section_headings(self):
         """The provided index page"""
         res = self.sample_validator._validate_section_heading_order()
         self.assertTrue(res)
-
-    def test_file_links_validate(self):
-        res = self.sample_validator._validate_links()
-        self.assertTrue(res)
-
-    def test_missing_file_fails_validation(self):
-        """Fail validation when an html file is linked without corresponding
-            markdown file"""
-        validator = self._create_validator("""[Broken link](nonexistent.html)""")
-        self.assertFalse(validator._validate_links())
-
-    def test_website_link_ignored_by_validator(self):
-        """Don't look for markdown if the file linked isn't local-
-            remote website links are ignored"""
-        validator = self._create_validator("""[Broken link](http://website.com/filename.html)""")
-        self.assertTrue(validator._validate_links())
-
-    def test_non_html_link_ignored_by_validator(self):
-        """Don't look for markdown if the file linked isn't an html file"""
-        # TODO: Revise test for new link criteria
-        # TODO: add link test for html pages, including anchors
-        validator = self._create_validator("""[Broken link](nonexistent.txt)""")
-        self.assertTrue(validator._validate_links())
 
     def test_index_fail_when_section_heading_absent(self):
         res = self.sample_validator.ast.has_section_heading("Fake heading")
@@ -169,6 +149,65 @@ Paragraph of introductory material.
 > before tackling this lesson.
 """)
         self.assertFalse(validator._validate_intro_section())
+
+    # TESTS INVOLVING LINKS TO OTHER CONTENT
+    def test_file_links_validate(self):
+        res = self.sample_validator._validate_links()
+        self.assertTrue(res)
+
+    def test_html_link_to_extant_md_file_passes(self):
+        """Verify that an HTML link with corresponding MD file will pass"""
+        validator = self._create_validator("""[Lesson Title](01-one.html)""")
+        self.assertTrue(validator._validate_links())
+
+    def test_html_linkwithanchor_to_extant_md_passes(self):
+        """Verify that link is identified correctly even if to page anchor
+
+        For now this just tests that the regex handles #anchors.
+         It doesn't validate that the named anchor exists in the md file
+        """
+        validator = self._create_validator("""[Lesson Title](01-one.html#anchor)""")
+        self.assertTrue(validator._validate_links())
+
+    def test_missing_markdown_file_fails_validation(self):
+        """Fail validation when an html file is linked without corresponding
+            markdown file"""
+        validator = self._create_validator("""[Broken link](nonexistent.html)""")
+        self.assertFalse(validator._validate_links())
+
+    def test_website_link_ignored_by_validator(self):
+        """Don't look for markdown if the file linked isn't local-
+            remote website links are ignored"""
+        validator = self._create_validator("""[Broken link](http://website.com/filename.html)""")
+        self.assertTrue(validator._validate_links())
+
+    def test_malformed_website_link_fails_validator(self):
+        """If the link isn't prefixed by http(s):// or ftp://, fail.
+         This is because there are a lot of edge cases in distinguishing
+            between filenames and URLs: err on the side of certainty."""
+        validator = self._create_validator("""[Broken link](www.website.com/filename.html)""")
+        self.assertFalse(validator._validate_links())
+
+    def test_non_html_link_finds_svg(self):
+        validator = self._create_validator(
+            """![this is the image's title](fig/example.svg "this is the image's alt text")""")
+        self.assertTrue(validator._validate_links())
+
+    def test_non_html_link_finds_csv(self):
+        """Look for CSV file in appropriate folder"""
+        validator = self._create_validator(
+            """Use [this CSV](data/data.csv) for the exercise.""")
+        self.assertTrue(validator._validate_links())
+
+    def test_non_html_links_are_path_sensitive(self):
+        validator = self._create_validator(
+            """Use [this CSV](data.csv) for the exercise.""")
+        self.assertFalse(validator._validate_links())
+
+    def test_non_html_broken_link_fails(self):
+        validator = self._create_validator(
+            """![this is the image's title](fig/exemple.svg "this is the image's alt text")""")
+        self.assertTrue(validator._validate_links())
 
 
 class TestTopicPage(BaseTemplateTest):
