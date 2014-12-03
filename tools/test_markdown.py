@@ -1,27 +1,27 @@
 #! /usr/bin/env python
 
-import unittest
-import validate_markdown_template
+import imp, os, unittest
+check = imp.load_source("check", os.path.join(os.path.dirname(__file__), "check"))  # Import non-.py file
 
-validate_markdown_template.start_logging()  # Make log messages visible to help audit test failures
+check.start_logging()  # Make log messages visible to help audit test failures
 
 
 class BaseTemplateTest(unittest.TestCase):
     """Common methods for testing template validators"""
     SAMPLE_FILE = "" # Path to a file that should pass all tests; use as basic benchmark
-    VALIDATOR = validate_markdown_template.MarkdownValidator
+    VALIDATOR = check.MarkdownValidator
 
     def setUp(self):
         self.sample_validator = self.VALIDATOR(self.SAMPLE_FILE)
 
     def _create_validator(self, markdown):
         """Create validator object from markdown string; useful for failures"""
-        return validate_markdown_template.IndexPageValidator(markdown=markdown)
+        return self.VALIDATOR(markdown=markdown)
 
 
 class TestAstHelpers(BaseTemplateTest):
     SAMPLE_FILE = '../pages/index.md'
-    VALIDATOR = validate_markdown_template.MarkdownValidator
+    VALIDATOR = check.MarkdownValidator
 
     def test_link_text_extracted(self):
         """Verify that link text and destination are extracted correctly"""
@@ -36,7 +36,7 @@ class TestAstHelpers(BaseTemplateTest):
 class TestIndexPage(BaseTemplateTest):
     """Test the ability to correctly identify and validate specific sections of a markdown file"""
     SAMPLE_FILE = "../pages/index.md"
-    VALIDATOR = validate_markdown_template.IndexPageValidator
+    VALIDATOR = check.IndexPageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
@@ -138,7 +138,7 @@ Paragraph of introductory material.
 class TestTopicPage(BaseTemplateTest):
     """Verifies that the topic page validator works as expected"""
     SAMPLE_FILE = "../pages/01-one.md"
-    VALIDATOR = validate_markdown_template.TopicPageValidator
+    VALIDATOR = check.TopicPageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
@@ -148,7 +148,7 @@ class TestTopicPage(BaseTemplateTest):
 class TestMotivationPage(BaseTemplateTest):
     """Verifies that the instructors page validator works as expected"""
     SAMPLE_FILE = "../pages/motivation.md"
-    VALIDATOR = validate_markdown_template.MotivationPageValidator
+    VALIDATOR = check.MotivationPageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
@@ -158,7 +158,7 @@ class TestMotivationPage(BaseTemplateTest):
 class TestReferencePage(BaseTemplateTest):
     """Verifies that the instructors page validator works as expected"""
     SAMPLE_FILE = "../pages/reference.md"
-    VALIDATOR = validate_markdown_template.ReferencePageValidator
+    VALIDATOR = check.ReferencePageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
@@ -168,7 +168,7 @@ class TestReferencePage(BaseTemplateTest):
 class TestInstructorPage(BaseTemplateTest):
     """Verifies that the instructors page validator works as expected"""
     SAMPLE_FILE = "../pages/instructors.md"
-    VALIDATOR = validate_markdown_template.InstructorPageValidator
+    VALIDATOR = check.InstructorPageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
@@ -177,7 +177,7 @@ class TestInstructorPage(BaseTemplateTest):
 
 class TestLicensePage(BaseTemplateTest):
     SAMPLE_FILE = '../pages/LICENSE.md'
-    VALIDATOR = validate_markdown_template.LicensePageValidator
+    VALIDATOR = check.LicensePageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
@@ -193,7 +193,7 @@ class TestLicensePage(BaseTemplateTest):
 
 class TestDiscussionPage(BaseTemplateTest):
     SAMPLE_FILE = '../pages/discussion.md'
-    VALIDATOR = validate_markdown_template.DiscussionPageValidator
+    VALIDATOR = check.DiscussionPageValidator
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()
