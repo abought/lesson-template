@@ -251,6 +251,7 @@ class IndexPageValidator(MarkdownValidator):
 
         It must be a paragraph, followed by blockquoted list of prereqs"""
         intro_block = self.ast.children[3]
+        print(intro_block.t)
         intro_section = self.ast.is_paragraph(intro_block)
         if not intro_section:
             logging.error(
@@ -258,7 +259,8 @@ class IndexPageValidator(MarkdownValidator):
                     intro_block.start_line))
 
         # Validate the prerequisites block
-        prereqs_block = self.ast.get_block_titled("Prerequisites")
+        prereqs_block = self.ast.get_block_titled("Prerequisites",
+                                                  heading_level=2)
         if prereqs_block:
             # Found the expected block; now check contents
             prereqs_tests = self.ast.has_number_children(prereqs_block[0],
@@ -268,8 +270,8 @@ class IndexPageValidator(MarkdownValidator):
 
         if prereqs_tests is False:
             logging.error(
-                "Intro section should contain a blockquoted section "
-                "titled 'Prerequisites', which should not be empty")
+                "Intro should contain a blockquoted section with level 2"
+                "title 'Prerequisites'. Section should not be empty.")
         return intro_section and prereqs_tests
 
     def _run_tests(self):
@@ -287,7 +289,8 @@ class TopicPageValidator(MarkdownValidator):
 
     # TODO: Write validator for, eg, challenge section
     def _validate_learning_objective(self):
-        learn_node = self.ast.get_block_titled("Learning Objectives")
+        learn_node = self.ast.get_block_titled("Learning Objectives",
+                                               heading_level=2)
         if learn_node:
             # In addition to title, the node must have some content
             node_tests = self.ast.has_number_children(learn_node[0], minc=2)
@@ -296,8 +299,8 @@ class TopicPageValidator(MarkdownValidator):
 
         if node_tests is False:
             logging.error(
-                "Topic should contain a blockquoted section "
-                "titled 'Learning Objectives', which should not be empty")
+                "Topic should contain a blockquoted section with level 2"
+                "title 'Learning Objectives'. Section should not be empty.")
 
         return node_tests
 

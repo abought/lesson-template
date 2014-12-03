@@ -9,9 +9,9 @@ except NameError:
   basestring = str
 
 
-#### Common validation functions ###
+# Common validation functions
 def is_list(text):
-    """Validate whether the provided string can be converted to a valid python list"""
+    """Validate whether the provided string can be converted to python list"""
     text = text.strip()
     try:
         text_as_list = json.loads(text)
@@ -43,20 +43,22 @@ def strip_attrs(s):
 
 
 def get_css_class(s):
-    """Return any and all CSS classes: present when a line is suffixed by {.classname}
+    """Return any and all CSS classes (when a line is suffixed by {.classname})
     Returns empty list when """
     return re.findall("\{\.(.*?)\}", s)
 
 
 ### Helper objects
 class CommonMarkHelper(object):
-    """Basic helper functions for working with the internal abstract syntax tree produced by CommonMark parser"""
+    """Basic helper functions for working with the internal abstract syntax
+    tree produced by CommonMark parser"""
     def __init__(self, ast):
         self.data = ast
         self.children = self.data.children
 
     def get_doc_header_title(self):
-        """Helper method for SWC templates: get the document title from the YAML headers"""
+        """Helper method for SWC templates: get the document title from
+        the YAML headers"""
         doc_headers = self.data.children[1]  # Throw index error if none found
 
         for s in doc_headers.strings:
@@ -67,17 +69,23 @@ class CommonMarkHelper(object):
         # If title not found, explicitly return None
         return None
 
-    def get_block_titled(self, title, ast_node=None):
+    def get_block_titled(self, title, heading_level=2, ast_node=None):
         """Examine children. Return all children of the given node that:
         a) are blockquoted elements, and
-        b) contain a heading with the specified text.
-        For example, this can be used to find the indented "Prerequisites" section in index.md
+        b) contain a heading with the specified text, at the specified level.
+        For example, this can be used to find the "Prerequisites" section
+            in index.md
 
         Returns empty list if no appropriate node is found"""
         if ast_node is None:
             ast_node = self.data
         return [n for n in ast_node.children
-                if self.is_block(n) and self.has_section_heading(title, ast_node=n, show_msg=False)]
+                if self.is_block(n) and
+                self.has_section_heading(
+                    title,
+                    ast_node=n,
+                    heading_level=heading_level,
+                    show_msg=False)]
 
     def get_section_headings(self, ast_node=None):
         """Returns a list of ast nodes that are headings"""
@@ -99,7 +107,7 @@ class CommonMarkHelper(object):
         return dest, link_text
 
     def find_links(self, ast_node=None):
-        """Recursive function that locates all hyperlinks under the specified node.
+        """Recursive function that locates all hyperlinks under specified node
         Returns a list specifying the destination of each link"""
         ast_node = ast_node or self.data
 
@@ -116,26 +124,33 @@ class CommonMarkHelper(object):
 
         return links
 
-    def has_section_heading(self, section_title, ast_node=None, limit=sys.maxsize, show_msg=True):
-        """Does the markdown contain (no more than x copies of) the specified heading text?
-        Automatically strips off any CSS attributes when looking for the section title"""
+    def has_section_heading(self, section_title, ast_node=None,
+                            heading_level=2, limit=sys.maxsize, show_msg=True):
+        """Does the file contain (<= x copies of) specified heading text?
+        Will strip off any CSS attributes when looking for the section title"""
         if ast_node is None:
             ast_node = self.data
 
         num_nodes = len([n for n in self.get_section_headings(ast_node)
-                         if strip_attrs(n.strings[0]) == section_title])
+                         if (strip_attrs(n.strings[0]) == section_title)
+                         and (n.level == heading_level)])
 
-        # Log an error message, unless explicitly told not to (eg if used as a helper method in a larger test)
+        # Suppress error msg if used as a helper method
         if show_msg and num_nodes == 0:
-            logging.error("Document does not contain the specified heading: {0}".format(section_title))
+            logging.error("Document does not contain the specified "
+                          "heading: {0}".format(section_title))
         elif show_msg and num_nodes > limit:
-            logging.error("Document must not contain more than {0} copies of the heading {1}".format(limit, section_title or 0))
+            logging.error("Document must not contain more than {0} copies of"
+                          " the heading {1}".format(limit, section_title or 0))
         elif show_msg:
-            logging.info("Verified that document contains the specified heading: {0}".format(section_title))
+            logging.info("Verified that document contains the specified"
+                         " heading: {0}".format(section_title))
         return (0 < num_nodes <= limit)
 
-    def has_number_children(self, ast_node, exact=None, minc=0, maxc=sys.maxsize):
-        """Does the specified node (such as a bulleted list) have the expected number of children?"""
+    def has_number_children(self, ast_node,
+                            exact=None, minc=0, maxc=sys.maxsize):
+        """Does the specified node (such as a bulleted list) have the expected
+         number of children?"""
 
         if exact:  # If specified, must have exactly this number of children
             minc = maxc = exact

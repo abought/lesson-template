@@ -1,14 +1,15 @@
 #! /usr/bin/env python
 
 import imp, os, unittest
-check = imp.load_source("check", os.path.join(os.path.dirname(__file__), "check"))  # Import non-.py file
+check = imp.load_source("check",  # Import non-.py file
+                        os.path.join(os.path.dirname(__file__), "check"))
 
 check.start_logging()  # Make log messages visible to help audit test failures
 
 
 class BaseTemplateTest(unittest.TestCase):
     """Common methods for testing template validators"""
-    SAMPLE_FILE = "" # Path to a file that should pass all tests; use as basic benchmark
+    SAMPLE_FILE = "" # Path to a file that should pass all tests
     VALIDATOR = check.MarkdownValidator
 
     def setUp(self):
@@ -34,7 +35,8 @@ class TestAstHelpers(BaseTemplateTest):
 
 
 class TestIndexPage(BaseTemplateTest):
-    """Test the ability to correctly identify and validate specific sections of a markdown file"""
+    """Test the ability to correctly identify and validate specific sections
+        of a markdown file"""
     SAMPLE_FILE = "../pages/index.md"
     VALIDATOR = check.IndexPageValidator
 
@@ -89,17 +91,21 @@ keywords: this is not a list
         self.assertTrue(res)
 
     def test_missing_file_fails_validation(self):
-        """Fail validation when an html file is linked without corresponding markdown file"""
+        """Fail validation when an html file is linked without corresponding
+            markdown file"""
         validator = self._create_validator("""[Broken link](nonexistent.html)""")
         self.assertFalse(validator._validate_links())
 
     def test_website_link_ignored_by_validator(self):
-        """Don't look for markdown if the file linked isn't local- remote website links are ignored"""
+        """Don't look for markdown if the file linked isn't local-
+            remote website links are ignored"""
         validator = self._create_validator("""[Broken link](http://website.com/filename.html)""")
         self.assertTrue(validator._validate_links())
 
     def test_non_html_link_ignored_by_validator(self):
         """Don't look for markdown if the file linked isn't an html file"""
+        # TODO: Revise test for new link criteria
+        # TODO: add link test for html pages, including anchors
         validator = self._create_validator("""[Broken link](nonexistent.txt)""")
         self.assertTrue(validator._validate_links())
 
@@ -133,6 +139,36 @@ Paragraph of introductory material.
 * [Topic Title 2](02-two.html)""")
 
         self.assertFalse(validator._validate_section_heading_order())
+
+    def test_pass_when_prereq_section_has_correct_heading_level(self):
+        validator = self._create_validator("""---
+layout: lesson
+title: Lesson Title
+keywords: ["some", "key terms", "in a list"]
+---
+Paragraph of introductory material.
+
+> ## Prerequisites
+>
+> A short paragraph describing what learners need to know
+> before tackling this lesson.
+""")
+        self.assertTrue(validator._validate_intro_section())
+
+    def test_fail_when_prereq_section_has_incorrect_heading_level(self):
+        validator = self._create_validator("""---
+layout: lesson
+title: Lesson Title
+keywords: ["some", "key terms", "in a list"]
+---
+Paragraph of introductory material.
+
+> # Prerequisites
+>
+> A short paragraph describing what learners need to know
+> before tackling this lesson.
+""")
+        self.assertFalse(validator._validate_intro_section())
 
 
 class TestTopicPage(BaseTemplateTest):
