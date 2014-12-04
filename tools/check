@@ -62,7 +62,7 @@ class MarkdownValidator(object):
             self.lesson_dir = os.path.abspath(
                 os.path.join(os.path.dirname(__file__), os.pardir))
 
-            self.markdown_dir =  os.path.join(self.lesson_dir, "pages")
+            self.markdown_dir = os.path.join(self.lesson_dir, "pages")
             self.markdown = markdown
 
         ast = self._parse_markdown(self.markdown)
@@ -211,12 +211,12 @@ class MarkdownValidator(object):
 
             dest_ast = self._parse_markdown(dest_contents)
             dest_ast = vh.CommonMarkHelper(dest_ast)
-            dest_page_title = dest_ast.get_doc_header_title()
+            dest_page_title = dest_ast.get_doc_header_subtitle()
 
             if dest_page_title != link_text:
                 logging.error("The linked page {0} exists, but "
                               "the link text '{1}' does not match the "
-                              "title of that page, '{2}'.".format(
+                              "(sub)title of that page, '{2}'.".format(
                                   dest, link_text, dest_page_title))
                 return False
         elif not re.match(r"^((https?|ftp)://)", dest, re.IGNORECASE):

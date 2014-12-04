@@ -66,8 +66,21 @@ class CommonMarkHelper(object):
             if label.lower() == "title":
                 return contents.strip()
 
-        # If title not found, explicitly return None
-        return None
+        # If title not found, return an empty string for display purposes
+        return ''
+
+    def get_doc_header_subtitle(self):
+        """Helper method for SWC templates: get the document title from
+        the YAML headers"""
+        doc_headers = self.data.children[1]  # Throw index error if none found
+
+        for s in doc_headers.strings:
+            label, contents = s.split(":", 1)
+            if label.lower() == "subtitle":
+                return contents.strip()
+
+        # If title not found, return an empty string for display purposes
+        return ''
 
     def get_block_titled(self, title, heading_level=2, ast_node=None):
         """Examine children. Return all children of the given node that:
