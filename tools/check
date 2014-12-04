@@ -219,8 +219,10 @@ class MarkdownValidator(object):
                               "(sub)title of that page, '{2}'.".format(
                                   dest, link_text, dest_page_title))
                 return False
-        elif not re.match(r"^((https?|ftp)://)", dest, re.IGNORECASE):
-            # If not web URL, verify that local file exists
+        elif not re.match(r"^((https?|ftp)://)", dest, re.IGNORECASE)\
+                and not re.match(r"^#.*", dest):
+            # If not web URL, and not anchor on same page, then
+            #  verify that local file exists
             dest_path = os.path.join(self.lesson_dir, dest)
             if not os.path.isfile(dest_path):
                 logging.error("Could not find the linked asset file "
@@ -367,16 +369,19 @@ class MotivationPageValidator(MarkdownValidator):
 
 class ReferencePageValidator(MarkdownValidator):
     """Validate reference.md"""
+    HEADINGS = ["Glossary"]
+    WARN_ON_EXTRA_HEADINGS = False
+
     DOC_HEADERS = {"layout": vh.is_str,
                    "title": vh.is_str,
                    "subtitle": vh.is_str}
-    HEADINGS = ["Glossary"]
 
 
 class InstructorPageValidator(MarkdownValidator):
     """Simple validator for Instructor's Guide- instructors.md"""
     HEADINGS = ["Legend", "Overall"]
     WARN_ON_EXTRA_HEADINGS = False
+
     DOC_HEADERS = {"layout": vh.is_str,
                    "title": vh.is_str,
                    "subtitle": vh.is_str}
@@ -407,6 +412,7 @@ class DiscussionPageValidator(MarkdownValidator):
     Validate the discussion page (discussion.md).
     Most of the content is free-form.
     """
+    WARN_ON_EXTRA_HEADINGS = False
     DOC_HEADERS = {"layout": vh.is_str,
                    "title": vh.is_str,
                    "subtitle": vh.is_str}

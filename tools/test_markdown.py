@@ -196,6 +196,14 @@ Paragraph of introductory material.
         validator = self._create_validator("""[Lesson Title](01-one.html#anchor)""")
         self.assertTrue(validator._validate_links())
 
+    def test_inpage_anchor_passes_validation(self):
+        """Links that reference anchors within the page should be ignored"""
+        # TODO: Revisit once anchor rules are available
+        validator = self._create_validator("""Most databases also support Booleans and date/time values;
+SQLite uses the integers 0 and 1 for the former, and represents the latter as discussed [earlier](#a:dates).""")
+        self.assertTrue(validator._validate_links())
+
+
     def test_missing_markdown_file_fails_validation(self):
         """Fail validation when an html file is linked without corresponding
             markdown file"""
