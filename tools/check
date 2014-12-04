@@ -133,11 +133,20 @@ class MarkdownValidator(object):
 
     def _validate_section_heading_order(self, ast_node=None, headings=None):
         """Verify that section headings appear, and in the order expected"""
+        # TODO: Refactor into individual tests in the future
         if ast_node is None:
             ast_node = self.ast.data
             headings = self.HEADINGS
 
         heading_nodes = self.ast.get_section_headings(ast_node)
+        # All headings should be exactly level 2
+        correct_level = True
+        for n in heading_nodes:
+            if n.level != 2:
+                logging.error("Heading at line {0} should be level 2".format(
+                    n.start_line))
+                correct_level = False
+
         heading_labels = [vh.strip_attrs(n.strings[0]) for n in heading_nodes]
 
         # Check for missing and extra headings
@@ -169,7 +178,8 @@ class MarkdownValidator(object):
                 "Document headings do not match "
                 "the order specified by the template")
 
-        return (len(missing_headings) == 0 and valid_order and no_extra)
+        return (len(missing_headings) == 0) \
+               and valid_order and no_extra and correct_level
 
     def _validate_one_link(self, link_node):
         """Logic to validate a single external asset (image or link)

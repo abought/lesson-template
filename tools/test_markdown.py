@@ -93,6 +93,33 @@ keywords: this is not a list
         res = self.sample_validator.ast.has_section_heading("Fake heading")
         self.assertFalse(res)
 
+    def test_fail_when_section_heading_is_wrong_level(self):
+        """All headings must be exactly level 2"""
+        validator = self._create_validator("""---
+layout: page
+title: Lesson Title
+---
+Paragraph of introductory material.
+
+> ## Prerequisites
+>
+> A short paragraph describing what learners need to know
+> before tackling this lesson.
+
+### Topics
+
+1.  [Topic Title 1](01-one.html)
+2.  [Topic Title 2](02-two.html)
+
+## Other Resources
+
+*   [Motivation](motivation.html)
+*   [Reference Guide](reference.html)
+*   [Next Steps](discussion.html)
+*   [Instructor's Guide](instructors.html)""")
+        self.assertFalse(validator._validate_section_heading_order())
+
+
     def test_fail_when_section_headings_in_wrong_order(self):
         validator = self._create_validator("""---
 layout: lesson
