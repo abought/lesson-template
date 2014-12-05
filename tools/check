@@ -11,8 +11,14 @@ Contains validators for several kinds of template.
 Call at command line with flag -h to see options and usage instructions.
 """
 from __future__ import print_function
-import argparse, glob, hashlib, logging, os, re, sys
 
+import argparse
+import glob
+import hashlib
+import logging
+import os
+import re
+import sys
 
 try:
     # Code tested with CommonMark version 0.5.4; API may change

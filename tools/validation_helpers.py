@@ -1,7 +1,9 @@
 #! /usr/bin/env python
 
-
-import json, logging, re, sys
+import json
+import logging
+import re
+import sys
 
 try:  # Hack to make codebase compatible with python 2 and 3
   basestring
