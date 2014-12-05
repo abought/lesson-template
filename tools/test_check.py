@@ -184,16 +184,16 @@ Paragraph of introductory material.
 
     def test_html_link_to_extant_md_file_passes(self):
         """Verify that an HTML link with corresponding MD file will pass"""
-        validator = self._create_validator("""[Lesson Title](01-one.html)""")
+        validator = self._create_validator("""[Topic Title One](01-one.html)""")
         self.assertTrue(validator._validate_links())
 
-    def test_html_linkwithanchor_to_extant_md_passes(self):
+    def test_html_link_with_anchor_to_extant_md_passes(self):
         """Verify that link is identified correctly even if to page anchor
 
         For now this just tests that the regex handles #anchors.
          It doesn't validate that the named anchor exists in the md file
         """
-        validator = self._create_validator("""[Lesson Title](01-one.html#anchor)""")
+        validator = self._create_validator("""[Topic Title One](01-one.html#anchor)""")
         self.assertTrue(validator._validate_links())
 
     def test_inpage_anchor_passes_validation(self):

@@ -89,15 +89,15 @@ class MarkdownValidator(object):
             hr_nodes = [self.ast.children[0], self.ast.children[2]]
         except IndexError:
             logging.error(
-                "In {}: "
+                "In {0}: "
                 "Document must include header sections".format(self.filename))
             return False
 
         for hr in hr_nodes:
             if not self.ast.is_hr(hr):
                 logging.error(
-                    "In {}: "
-                    "Expected --- at line: {0}".format(
+                    "In {0}: "
+                    "Expected --- at line: {1}".format(
                         self.filename, hr.start_line))
                 valid = False
         return valid
@@ -107,8 +107,8 @@ class MarkdownValidator(object):
         label, content = text.split(":", 1)
         if label not in self.DOC_HEADERS:
             logging.warning(
-                "In {}: "
-                "Unrecognized label in header section: {}".format(
+                "In {0}: "
+                "Unrecognized label in header section: {1}".format(
                     self.filename, label))
             return False
 
@@ -116,8 +116,8 @@ class MarkdownValidator(object):
         validate_header = validation_function(content)
         if not validate_header:
             logging.error(
-                "In {}: "
-                "Document header field for label {} "
+                "In {0}: "
+                "Document header field for label {1} "
                 "does not follow expected format".format(self.filename, label))
         return validate_header
 
@@ -157,8 +157,8 @@ class MarkdownValidator(object):
         for n in heading_nodes:
             if n.level != 2:
                 logging.error(
-                    "In {}: "
-                    "Heading at line {} should be level 2".format(
+                    "In {0}: "
+                    "Heading at line {1} should be level 2".format(
                         self.filename, n.start_line))
                 correct_level = False
 
@@ -173,20 +173,20 @@ class MarkdownValidator(object):
 
         for h in missing_headings:
             logging.error(
-                "In {}: "
-                "Document is missing expected heading: {}".format(
+                "In {0}: "
+                "Document is missing expected heading: {1}".format(
                     self.filename, h))
 
         if self.WARN_ON_EXTRA_HEADINGS is True:
             for h in extra_headings:
                 logging.error(
-                    "In {}: "
+                    "In {0}: "
                     "Document contains heading "
-                    "not specified in the template: {}".format(
+                    "not specified in the template: {1}".format(
                         self.filename, h))
             no_extra = (len(extra_headings) == 0)
         else:
-            no_extra = False
+            no_extra = True
 
         # Check that the subset of headings
         # in the template spec matches order in the document
@@ -195,12 +195,12 @@ class MarkdownValidator(object):
         if len(missing_headings) == 0 and headings_overlap != headings:
             valid_order = False
             logging.error(
-                "In {}: "
+                "In {0}: "
                 "Document headings do not match "
                 "the order specified by the template".format(self.filename))
 
-        return (len(missing_headings) == 0) \
-               and valid_order and no_extra and correct_level
+        return (len(missing_headings) == 0) and \
+               valid_order and no_extra and correct_level
 
     def _validate_one_link(self, link_node):
         """Logic to validate a single external asset (image or link)
@@ -222,9 +222,9 @@ class MarkdownValidator(object):
                                             expected_md_fn)
             if not os.path.isfile(expected_md_path):
                 logging.error(
-                    "In {}: "
-                    "The document links to {}, but could not find "
-                    "the expected markdown file {}".format(
+                    "In {0}: "
+                    "The document links to {1}, but could not find "
+                    "the expected markdown file {2}".format(
                         self.filename, dest, expected_md_path))
                 return False
 
@@ -238,10 +238,10 @@ class MarkdownValidator(object):
 
             if dest_page_title != link_text:
                 logging.error(
-                    "In {}: "
-                    "The linked page {} exists, but "
-                    "the link text '{}' does not match the "
-                    "(sub)title of that page, '{}'.".format(
+                    "In {0}: "
+                    "The linked page {1} exists, but "
+                    "the link text '{2}' does not match the "
+                    "(sub)title of that page, '{3}'.".format(
                         self.filename, dest,
                         link_text, dest_page_title))
                 return False
@@ -252,23 +252,23 @@ class MarkdownValidator(object):
             dest_path = os.path.join(self.lesson_dir, dest)
             if not os.path.isfile(dest_path):
                 logging.error(
-                    "In {}: "
+                    "In {0}: "
                     "Could not find the linked asset file "
-                    "{} in {}. If this is a URL, it must be "
+                    "{1} in {2}. If this is a URL, it must be "
                     "prefixed with http(s):// or ftp://.".format(
                         self.filename, dest, dest_path))
                 return False
         else:
             logging.warning(
-                "In {}: "
-                "Skipped validation of link {}".format(self.filename, dest))
+                "In {0}: "
+                "Skipped validation of link {1}".format(self.filename, dest))
         return True
 
     def _validate_links(self):
         """Validate all references to external content
 
         This includes links AND images: these are the two types of node that
-          CommonMark assigns a .destination property"""
+        CommonMark assigns a .destination property"""
         links = self.ast.find_external_links()
 
         valid = True
@@ -314,8 +314,8 @@ class IndexPageValidator(MarkdownValidator):
         intro_section = self.ast.is_paragraph(intro_block)
         if not intro_section:
             logging.error(
-                "In {}: "
-                "Expected paragraph of introductory text at {}".format(
+                "In {0}: "
+                "Expected paragraph of introductory text at {1}".format(
                     self.filename, intro_block.start_line))
 
         # Validate the prerequisites block
@@ -330,8 +330,8 @@ class IndexPageValidator(MarkdownValidator):
 
         if prereqs_tests is False:
             logging.error(
-                "In {}: "
-                "Intro should contain a blockquoted section with level 2"
+                "In {0}: "
+                "Intro should contain a blockquoted section with level 2 "
                 "title 'Prerequisites'. Section should not be empty.".format(
                     self.filename))
         return intro_section and prereqs_tests
@@ -361,7 +361,7 @@ class TopicPageValidator(MarkdownValidator):
 
         if node_tests is False:
             logging.error(
-                "In {}: "
+                "In {0}: "
                 "Learning Objectives should not be empty.".format(
                     self.filename))
 
@@ -377,15 +377,15 @@ class TopicPageValidator(MarkdownValidator):
             return True
 
         logging.error(
-            "In {}: "
+            "In {0}: "
             "The topic page should not have sub-headings "
             "outside of special blocks. "
             "If a topic needs sub-headings, "
             "it should be broken into multiple topics.".format(self.filename))
         for n in heading_nodes:
             logging.warning(
-                "In {}: "
-                "The following sub-heading should be removed: {}".format(
+                "In {0}: "
+                "The following sub-heading should be removed: {1}".format(
                     self.filename, n.strings[0]))
         return False
 
@@ -482,23 +482,24 @@ def validate_single(filepath, template=None):
     template = template or identify_template(filepath)
     if template is None:
         logging.error(
-            "Validation failed for {}: "
+            "Validation failed for {0}: "
             "Could not automatically identify correct template.".format(
                 filepath))
         return False
 
     logging.debug(
-        "Beginning validation of {} using template {}".format(
+        "Beginning validation of {0} using template {1}".format(
             filepath, template))
     validator = LESSON_TEMPLATES[template][0]
     validate_file = validator(filepath)
 
     res = validate_file.validate()
     if res is True:
-        logging.debug("File {} successfully passed validation".format(filepath))
+        logging.debug("File {0} successfully passed validation".format(
+            filepath))
     else:
-        logging.debug("File {} failed validation: "
-                     "see error log for details".format(filepath))
+        logging.debug("File {0} failed validation: "
+                      "see error log for details".format(filepath))
 
     return res
 
@@ -511,7 +512,7 @@ def validate_folder(path, template=None):
     if not filename_list:
         logging.error(
             "No Markdown files were found "
-            "in specified directory {}".format(path))
+            "in specified directory {0}".format(path))
         return False
 
     all_valid = True
@@ -556,16 +557,16 @@ def main(parsed_args_obj):
     template = parsed_args_obj.template
 
     all_valid = True
-    for e in parsed_args_obj.file_or_path:
-        if os.path.isdir(e):
-            res = validate_folder(e, template=template)
-        elif os.path.isfile(e):
-            res = validate_single(e, template=template)
+    for fn in parsed_args_obj.file_or_path:
+        if os.path.isdir(fn):
+            res = validate_folder(fn, template=template)
+        elif os.path.isfile(fn):
+            res = validate_single(fn, template=template)
         else:
             res = False
             logging.error(
-                "The specified file or folder {} does not exist; "
-                "could not perform validation".format(e))
+                "The specified file or folder {0} does not exist; "
+                "could not perform validation".format(fn))
 
         all_valid = all_valid and res
 
