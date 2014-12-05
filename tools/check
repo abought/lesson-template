@@ -264,7 +264,7 @@ class MarkdownValidator(object):
                 "Skipped validation of link {1}".format(self.filename, dest))
         return True
 
-    def _validate_links(self):
+    def _validate_links(self, links_to_skip=[]):
         """Validate all references to external content
 
         This includes links AND images: these are the two types of node that
@@ -273,8 +273,9 @@ class MarkdownValidator(object):
 
         valid = True
         for link_node in links:
-            res = self._validate_one_link(link_node)
-            valid = valid and res
+            if link_node.destination not in links_to_skip:
+                res = self._validate_one_link(link_node)
+                valid = valid and res
         return valid
 
     def _run_tests(self):
@@ -335,6 +336,12 @@ class IndexPageValidator(MarkdownValidator):
                 "title 'Prerequisites'. Section should not be empty.".format(
                     self.filename))
         return intro_section and prereqs_tests
+
+    def _validate_links(self, links_to_skip=['motivation.html',
+                                             'reference.html',
+                                             'discussion.html',
+                                             'instructors.html']):
+        return super()._validate_links(links_to_skip)
 
     def _run_tests(self):
         tests = [self._validate_intro_section()]
