@@ -269,9 +269,58 @@ class TestMotivationPage(BaseTemplateTest):
 
 
 class TestReferencePage(BaseTemplateTest):
-    """Verifies that the instructors page validator works as expected"""
+    """Verifies that the reference page validator works as expected"""
     SAMPLE_FILE = "../pages/reference.md"
     VALIDATOR = check.ReferencePageValidator
+
+    def test_missing_glossary_definition(self):
+        validator = self._create_validator("")
+        self.assertFalse(validator._validate_glossary_entry(
+            ["Key word"]))
+
+    def test_missing_colon_at_glossary_definition(self):
+        validator = self._create_validator("")
+        self.assertFalse(validator._validate_glossary_entry(
+            ["Key word", "Definition of term"]))
+
+    def test_wrong_identation_at_glossary_definition(self):
+        validator = self._create_validator("")
+        self.assertFalse(validator._validate_glossary_entry(
+            ["Key word", ": Definition of term"]))
+
+    def test_wrong_continuation_at_glossary_definition(self):
+        validator = self._create_validator("")
+        self.assertFalse(validator._validate_glossary_entry(
+            ["Key word", ":   Definition of term", "continuation"]))
+
+    def test_glossary_definition(self):
+        validator = self._create_validator("")
+        self.assertTrue(validator._validate_glossary_entry(
+            ["Key word", ":   Definition of term", "    continuation"]))
+
+    def test_paragraph_at_glossary(self):
+        validator = self._create_validator("""## Glossary
+
+Key Word 1
+:   Definition of first term
+
+Paragraph
+
+Key Word 2
+:   Definition of second term
+""")
+        self.assertFalse(validator._validate_glossary())
+
+    def test_glossary(self):
+        validator = self._create_validator("""## Glossary
+
+Key Word 1
+:   Definition of first term
+
+Key Word 2
+:   Definition of second term
+""")
+        self.assertTrue(validator._validate_glossary())
 
     def test_sample_file_passes_validation(self):
         res = self.sample_validator.validate()

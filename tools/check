@@ -412,6 +412,58 @@ class ReferencePageValidator(MarkdownValidator):
                    "title": vh.is_str,
                    "subtitle": vh.is_str}
 
+    def _validate_glossary_entry(self, glossary_entry):
+        """Validate glossary entry
+
+        Glossary entry must be formated in conformance with Pandoc's
+        ```definition_lists``` extension."""
+        entry_is_valide = True
+
+        if len(glossary_entry) < 2:
+            logging.error(
+                    "In {}:"
+                    "Glossary entry must have at least two lines.".format(
+                        self.filename))
+            entry_is_valide = False
+        else:
+            for line_index, line in enumerate(glossary_entry):
+                if line_index == 1:
+                    if not re.match("^:   ", line):
+                        logging.error(
+                                "In {}:"
+                                "Definition must start with ':    '.".format(
+                                    self.filename))
+                        entry_is_valide = False
+                elif line_index > 1:
+                    if not re.match("^    ", line):
+                        logging.error(
+                                "In {}:"
+                                "Definition must start with '     '.".format(
+                                    self.filename))
+                        entry_is_valide = False
+
+        return entry_is_valide
+
+    def _validate_glossary(self):
+        """Validate the glossary section
+
+        Only definition itens are allow."""
+        is_glossary_valide = True
+        in_glossary = False
+        for children in self.ast.children:
+            if in_glossary:
+                is_glossary_valide = is_glossary_valide and \
+                    self._validate_glossary_entry(children.strings)
+            elif children.t == "ATXHeader" and "Glossary" in children.strings:
+                in_glossary = True
+
+        return is_glossary_valide
+
+    def _run_tests(self):
+        tests = [self._validate_glossary()]
+        parent_tests = super(ReferencePageValidator, self)._run_tests()
+        return all(tests) and parent_tests
+
 
 class InstructorPageValidator(MarkdownValidator):
     """Simple validator for Instructor's Guide- instructors.md"""
