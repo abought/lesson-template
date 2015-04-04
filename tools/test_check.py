@@ -331,7 +331,7 @@ A spacer paragraph
 >
 > What learners need to know before tackling this lesson.
 """)
-        callout_node = validator.ast.get_callouts()[0]
+        callout_node = validator.ast.get_boxes()[0]
         self.assertFalse(validator._validate_one_callout(callout_node))
 
     def test_block_ignored_sans_heading(self):
@@ -342,7 +342,7 @@ A spacer paragraph
 >
 > What learners need to know before tackling this lesson.
 """)
-        callout_nodes = validator.ast.get_callouts()
+        callout_nodes = validator.ast.get_boxes()
         self.assertEqual(len(callout_nodes), 0)
 
     def test_callout_heading_must_be_l2(self):

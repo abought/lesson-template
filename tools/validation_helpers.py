@@ -2,8 +2,12 @@
 
 import json
 import logging
-import re
 import sys
+
+import pypandoc
+import pandocfilters
+
+import filters.common as fc
 
 try:  # Hack to make codebase compatible with python 2 and 3
   basestring
@@ -14,6 +18,7 @@ except NameError:
 # Common validation functions
 def is_list(text):
     """Validate whether the provided string can be converted to python list"""
+    # FIXME: deprecated
     text = text.strip()
     try:
         text_as_list = json.loads(text)
@@ -26,6 +31,7 @@ def is_list(text):
 
 def is_str(text):
     """Validate whether the input is a non-blank python string"""
+    # FIXME: Maybe deprecated?
     return isinstance(text, basestring) and len(text) > 0
 
 
@@ -38,140 +44,161 @@ def is_numeric(text):
         return False
 
 
-#### Text cleanup functions, pre-validation
-def strip_attrs(s):
-    """Strip attributes of the form {.name} from a markdown title string"""
-    return re.sub(r"\s\{\..*?\}", "", s)
-
-
-def get_css_class(s):
-    """Return any and all CSS classes (when a line is suffixed by {.classname})
-    Returns empty list when """
-    return re.findall("\{\.(.*?)\}", s)
+def node_or_root(f):
+    """Class method decorator: if no node is specified, use root node"""
+    def decorator(self, ast_node, *args, **kwargs):
+        if ast_node is None:
+            ast_node = self.body
+        return f(self, ast_node, *args, **kwargs)
+    return decorator
 
 
 ### Helper objects
-class CommonMarkHelper(object):
+class PandocAstHelper(object):
     """Basic helper functions for working with the internal abstract syntax
-    tree produced by CommonMark parser"""
-    def __init__(self, ast):
-        self.data = ast
-        self.children = self.data.children
+    tree produced by Pandoc parser"""
+    def __init__(self, markdown):
+        self.ast_root, self.header, self.body = self._parse_markdown(markdown)
 
-    def get_doc_header_title(self):
-        """Helper method for SWC templates: get the document title from
-        the YAML headers"""
-        doc_headers = self.data.children[1]  # Throw index error if none found
+    @staticmethod
+    def _parse_markdown(markdown):
+        """
+        Parse the provided markdown string
+        """
+        ast = json.loads(pypandoc.convert(markdown,
+                                          'json',
+                                          'markdown'))
+        headers = ast[0]["unMeta"]
+        body = ast[1]
+        return ast, headers, body
 
-        for s in doc_headers.strings:
-            label, contents = s.split(":", 1)
-            if label.lower() == "title":
-                return contents.strip()
-
-        # If title not found, return an empty string for display purposes
-        return ''
-
-    def get_doc_header_subtitle(self):
-        """Helper method for SWC templates: get the document title from
-        the YAML headers"""
-        doc_headers = self.data.children[1]  # Throw index error if none found
-
-        for s in doc_headers.strings:
-            label, contents = s.split(":", 1)
-            if label.lower() == "subtitle":
-                return contents.strip()
-
-        # If title not found, return an empty string for display purposes
-        return ''
-
-    def get_block_titled(self, title, heading_level=2, ast_node=None):
-        """Examine children. Return all children of the given node that:
-        a) are blockquoted elements, and
-        b) contain a heading with the specified text, at the specified level.
-        For example, this can be used to find the "Prerequisites" section
-            in index.md
-
-        Returns empty list if no appropriate node is found"""
-
-        # TODO: Deprecate in favor of callout validator
-        if ast_node is None:
-            ast_node = self.data
-        return [n for n in ast_node.children
-                if self.is_block(n) and
-                self.has_section_heading(
-                    title,
-                    ast_node=n,
-                    heading_level=heading_level,
-                    show_msg=False)]
-
-    # Helpers to fetch specific document sections
-    def get_section_headings(self, ast_node=None):
-        """Returns a list of ast nodes that are headings"""
-        if ast_node is None:
-            ast_node = self.data
-        return [n for n in ast_node.children if self.is_heading(n)]
-
-    def get_callouts(self, ast_node=None):
-        if ast_node is None:
-            ast_node = self.data
-        return [n for n in ast_node.children if self.is_callout(n)]
-
-    def find_external_links(self, ast_node=None, parent_crit=None):
-        """Recursive function that locates all references to external content
-         under specified node. (links or images)"""
-        ast_node = ast_node or self.data
-        if parent_crit is None:
-            # User can optionally provide a function to filter link list
-            # based on where link appears. (eg, only links in headings)
-            # If no filter is provided, accept all links in that node.
-            parent_crit = lambda n: True
-
-        # Link can be node itself, or hiding in inline content
-        links = [n for n in ast_node.inline_content
-                 if self.is_external(n) and parent_crit(ast_node)]
-
-        if self.is_external(ast_node):
-            links.append(ast_node)
-
-        # Also look for links in sub-nodes
-        for n in ast_node.children:
-            links.extend(self.find_external_links(n,
-                                                  parent_crit=parent_crit))
-
-        return links
+    @staticmethod
+    def ast_to_string(ast_node):
+        """Convert Pandoc AST to string."""
+        return pandocfilters.stringify(ast_node)
 
     # Helpers to get information from a specific node type
+    def get_heading_info(self, heading_node):
+        """Get heading text, level, and list of all css styles applied"""
+        if not self.is_heading(heading_node):
+            raise TypeError("Cannot apply this method to something that is not a heading")
+
+        text = self.ast_to_string(heading_node)
+        level = heading_node['c'][0]
+        box_styles = heading_node['c'][1][1]  # List of all styles
+        return text, level, box_styles
+
+    def get_box_info(self, box_node):
+        """Given a callout box, return the title, level, and [styles] for
+        the heading node."""
+        if not self.is_box(box_node):
+            raise TypeError("Cannot apply this method to something that is not a box")
+
+        box_heading = box_node['c'][0]
+        title, level, styles = self.get_heading_info(box_heading)
+        return title, level, styles
+
     def get_link_info(self, link_node):
         """Given a link node, return the link title and destination"""
+        # ToDO: implement fetching of link info
+        # FIXME: For refactoring, this change switches the order of function outputs
         if not self.is_external(link_node):
             raise TypeError("Cannot apply this method to something that is not a link")
 
-        dest = link_node.destination
-        try:
-            link_text = link_node.label[0].c
-        except:
-            link_text = None
+        link_text = self.ast_to_string(link_node)
+        dest_url = self.get_children(link_node)[1][0]
 
-        return dest, link_text
+        return link_text, dest_url
 
-    def get_heading_info(self, heading_node):
-        """Get heading text and list of all css styles applied"""
-        heading = heading_node.strings[0]
-        text = strip_attrs(heading)
-        css = get_css_class(heading)
-        return text, css
+    # Functions to fetch specific parts of the document
+    @node_or_root
+    def get_children(self, ast_node=None):
+        """Get children of node, if any are defined"""
+        return ast_node.get('c', [])
+
+    def get_header_field(self, field_label):
+        """Fetch the value of one field from the document YAML headers.
+        If the field label is not present, return None for display purposes"""
+        # TODO: does this need to be rewritten?
+        return self.header.get(field_label, None)
+
+    # Helpers to fetch specific document sections
+    @node_or_root
+    def get_section_headings(self, ast_node=None):
+        """Return a list of headings as (title, level, styles) tuples"""
+        # FIXME: This changes the order of outputs vs original version
+        # TODO: consider returning raw heading nodes for consistency?
+        return [self.get_heading_info(n)
+                for n in ast_node if self.is_heading(n)]
+
+    @node_or_root
+    def get_boxes(self, ast_node=None):
+        return [n for n in ast_node['c']
+                if self.is_box(n)]
+
+    @node_or_root
+    def get_doc_anchors(self, ast_node=None):
+        """Get a list of known anchors (places a link can go)
+        that are present in the document (or below the given node)"""
+        anchors = []
+
+        def get_anchors(key, val, format, meta):
+            if key == "Header":
+                anchors.append(val[1][0])
+            if key == "DefinitionList":
+                for definition in val:
+                    anchor_label = fc.text2fragment_identifier(
+                        self.ast_to_string(definition[0]))
+                    anchors.append(anchor_label)
+
+        pandocfilters.walk(ast_node, get_anchors, "", {})
+        return anchors
+
+    @node_or_root
+    def find_external_links(self, ast_node=None, parent_crit=None, _ok=False):
+        # TODO: Update this function
+        """Recursive function that locates all references to external content
+         under specified node. (links or images)
+
+         User can optionally provide a `parent_crit` function to filter link
+           list based on where link appears. (eg, only links in headings)
+        If no filter is provided, accept all links.
+
+        The parameter `_ok` is used internally to track whether parent
+          criterion was met
+         """
+
+        # Check whether this node (or any children) contains an accepted link
+        if parent_crit is None:
+            accept = True
+        else:
+            accept = _ok or parent_crit(ast_node)
+
+        links = []
+        if self.is_external(ast_node):
+            links.append(ast_node)
+
+        # Also look for links in child nodes.
+        for n in self.get_children(ast_node):
+            links.extend(self.find_external_links(n,
+                                                  parent_crit=parent_crit,
+                                                  _ok=accept))
+
+        return links
 
     # Functions to query type or content of nodes
     def has_section_heading(self, section_title, ast_node=None,
                             heading_level=2, limit=sys.maxsize, show_msg=True):
         """Does the section contain (<= x copies of) specified heading text?
         Will strip off any CSS attributes when looking for the section title"""
+        # TODO: Alternate Raniere implementation may deprecate this?
         if ast_node is None:
-            ast_node = self.data
+            ast_node = self.ast_root
 
-        num_nodes = len([n for n in self.get_section_headings(ast_node)
-                         if (strip_attrs(n.strings[0]) == section_title)
-                         and (n.level == heading_level)])
+        num_nodes = len([ti
+                         for ti, lvl, _ in self.get_section_headings(ast_node)
+                         if ti == section_title
+                         and (lvl == heading_level)])
 
         # Suppress error msg if used as a helper method
         if show_msg and num_nodes == 0:
@@ -185,6 +212,8 @@ class CommonMarkHelper(object):
                          " heading: {0}".format(section_title))
         return (0 < num_nodes <= limit)
 
+    # TODO: End untouched section
+
     def has_number_children(self, ast_node,
                             exact=None, minc=0, maxc=sys.maxsize):
         """Does the specified node (such as a bulleted list) have the expected
@@ -193,48 +222,43 @@ class CommonMarkHelper(object):
         if exact:  # If specified, must have exactly this number of children
             minc = maxc = exact
 
-        return (minc <= len(ast_node.children) <= maxc)
+        return (minc <= len(ast_node['c']) <= maxc)
 
-    # Helpers, in case the evolving CommonMark spec changes the names of nodes
-    def is_hr(self, ast_node):
-        """Is the node a horizontal rule (hr)?"""
-        return ast_node.t == 'HorizontalRule'
-
+    # Helper functions to improve readability of code that works on the AST
     def is_heading(self, ast_node, heading_level=None):
-        """Is the node a heading/ title?"""
-        has_tag = ast_node.t == "ATXHeader"
+        """Is the node a heading/ title?
+        (Optional: check that it is a specific heading level)"""
+        has_tag = (ast_node['t'] == "Header")
 
         if heading_level is None:
             has_level = True
         else:
-            has_level = (ast_node.level == heading_level)
+            #FIXME: This is a different method of level vs self.get_heading_info; resolve discrepancy
+            level = (self.ast_to_string(ast_node['c'][2]))
+            has_level = (level == heading_level)
         return has_tag and has_level
 
     def is_paragraph(self, ast_node):
         """Is the node a paragraph?"""
-        return ast_node.t == "Paragraph"
+        return ast_node['t'] == "Para"
 
     def is_list(self, ast_node):
         """Is the node a list? (ordered or unordered)"""
-        return ast_node.t == "List"
-
-    def is_link(self, ast_node):
-        """Is the node a link?"""
-        return ast_node.t == "Link"
+        return ast_node['t'] == "BulletList" or "OrderedList"
 
     def is_external(self, ast_node):
         """Does the node reference content outside the file? (image or link)"""
-        return ast_node.t in ("Link", "Image")
+        return ast_node['t'] in ("Link", "Image")
 
     def is_block(self, ast_node):
         """Is the node a BlockQuoted element?"""
-        return ast_node.t == "BlockQuote"
+        return ast_node['t'] == "BlockQuote"
 
-    def is_callout(self, ast_node):
-        """Composite element: "callout" elements in SWC templates are
+    def is_box(self, ast_node):
+        """Composite element: "box" elements in SWC templates are
         blockquotes whose first child element is a heading"""
-        if len(ast_node.children) > 0 and \
-                self.is_heading(ast_node.children[0]):
+        if self.has_number_children(ast_node, minc=2) and \
+                self.is_heading(ast_node['c'][0]):
             has_heading = True
         else:
             has_heading = False

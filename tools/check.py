@@ -87,29 +87,6 @@ class MarkdownValidator(object):
                 valid = False
         return valid
 
-    def _validate_hrs(self):
-        """Validate header
-
-        Verify that the header section at top of document
-        is bracketed by two horizontal rules"""
-        valid = True
-        try:
-            hr_nodes = [self.ast.children[0], self.ast.children[2]]
-        except IndexError:
-            logging.error(
-                "In {0}: "
-                "Document must include header sections".format(self.filename))
-            return False
-
-        for hr in hr_nodes:
-            if not self.ast.is_hr(hr):
-                logging.error(
-                    "In {0}: "
-                    "Expected --- at line: {1}".format(
-                        self.filename, hr.start_line))
-                valid = False
-        return valid
-
     def _validate_one_doc_header_row(self, label, content):
         """Validate a single row of the document header section"""
         if label not in self.DOC_HEADERS:
@@ -138,7 +115,7 @@ class MarkdownValidator(object):
         # Test: Header section should be wrapped in hrs
         has_hrs = self._validate_hrs()
 
-        header_node = self.ast.children[1]
+        header_node = self.ast.get_children()[1]
         header_text = '\n'.join(header_node.strings)
 
         # Parse headers as YAML. Don't check if parser returns None or str.
@@ -236,7 +213,7 @@ class MarkdownValidator(object):
         An additional test is done in another function:
         * Checks # times callout style appears in document, minc <= n <= maxc
         """
-        heading_node = callout_node.children[0]
+        heading_node = callout_node['c'][0]
         valid_head_lvl = self.ast.is_heading(heading_node, heading_level=2)
         title, styles = self.ast.get_heading_info(heading_node)
 
@@ -285,7 +262,7 @@ class MarkdownValidator(object):
 
         The style is a better determinant of callout than the title
         """
-        callout_nodes = self.ast.get_callouts()
+        callout_nodes = self.ast.get_boxes()
         callouts_valid = True
 
         # Validate all the callout nodes present
@@ -467,7 +444,7 @@ class IndexPageValidator(MarkdownValidator):
         """Validate the intro section
 
         It must be a paragraph, followed by blockquoted list of prereqs"""
-        intro_block = self.ast.children[3]
+        intro_block = self.ast['c'][3]
         intro_section = self.ast.is_paragraph(intro_block)
         if not intro_section:
             logging.error(
@@ -595,7 +572,7 @@ class ReferencePageValidator(MarkdownValidator):
         """
         is_glossary_valid = True
         in_glossary = False
-        for node in self.ast.children:
+        for node in self.ast['c']:
             if in_glossary:
                 is_glossary_valid = is_glossary_valid and \
                     self._validate_glossary_entry(node.strings)
